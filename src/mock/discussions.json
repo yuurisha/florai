@@ -1,0 +1,36 @@
+{
+  "ai-ethics": {
+    "title": "AI and Ethical Challenges",
+    "content": "Artificial intelligence is reshaping society in profound ways.\nEthical considerations like bias, transparency, and accountability are essential.\nHow do we ensure AI remains beneficial for all?",
+    "author": "Dr. Evelyn Reed",
+    "date": "October 26, 2023",
+    "tags": ["AI", "Ethics", "Technology", "Future", "Society"],
+    "replies": [
+      {
+        "name": "Alex Chen",
+        "text": "Totally agree — bias in datasets is a serious issue."
+      },
+      {
+        "name": "Sophia Kim",
+        "text": "Transparency in AI decisions should be a requirement."
+      }
+    ]
+  },
+  "biodiversity": {
+    "title": "test",
+    "content": " Biodiversity is crucial for ecosystem health.\nConservation efforts are needed to protect endangered species and habitats.\nWhat strategies can we implement to preserve biodiversity?",
+    "author": "Dr. Evelyn Reed",
+    "date": "October 26, 2023",
+    "tags": ["AI", "Ethics", "Technology", "Future", "Society"],
+    "replies": [
+      {
+        "name": "Kim Jong In",
+        "text": "Totally agree — biodiversity loss is a critical issue."
+      },
+      {
+        "name": "Kim Jun Myeon",
+        "text": "Governments should enforce stricter regulations on habitat destruction."
+      }
+    ]
+  }
+}
