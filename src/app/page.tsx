@@ -10,7 +10,7 @@ export default function Home() {
   return (
     <div className="flex flex-col min-h-screen">
       {/* Header */}
-      <header className="border-b shadow-sm">
+      <header className="border-b shadow-sm bg-green-100">
         <div className="container flex h-16 items-center justify-between px-4 md:px-6">
           <Link href="/" className="flex items-center gap-2">
             <Leaf className="h-6 w-6 text-green-600" />
@@ -18,8 +18,6 @@ export default function Home() {
           </Link>
           <nav className="hidden md:flex gap-6">
             <Link href="#features" className="text-sm font-medium hover:underline underline-offset-4">Features</Link>
-            <Link href="#about" className="text-sm font-medium hover:underline underline-offset-4">About</Link>
-            <Link href="#contact" className="text-sm font-medium hover:underline underline-offset-4">Contact</Link>
           </nav>
           <div className="flex items-center gap-4">
             <Link href="/login"><Button className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded">Log in</Button></Link>
@@ -45,16 +43,16 @@ export default function Home() {
               </Link>
             </div>
           </div>
-          <div className="mx-auto lg:ml-auto">
+            <div className="w-full lg:w-auto mx-auto lg:ml-auto">
             <Image
-              src="/placeholder.svg"
+              src="/placeholder.jpeg"
               alt="Green space visualization"
-              width={550}
+              width={800}
               height={550}
-              className="rounded-lg object-cover"
+              className="rounded-lg object-cover w-full h-auto max-w-full"
               priority
             />
-          </div>
+            </div>
         </div>
       </section>
 
@@ -76,8 +74,8 @@ export default function Home() {
               desc: "Access real-time and historical weather insights."
             }, {
               icon: <BarChart3 className="h-12 w-12 text-green-600" />,
-              title: "Plant Spread Analytics",
-              desc: "Analyze plant growth patterns over time."
+              title: "Plant Health and Spread Prediction",
+              desc: "Analyze plant health and receive invasive plant species alerts."
             }].map((feature, i) => (
               <div key={i} className="border p-6 rounded-lg shadow-sm text-left space-y-4">
                 {feature.icon}
@@ -95,11 +93,9 @@ export default function Home() {
           <h2 className="text-3xl font-bold sm:text-4xl md:text-5xl">
             Ready to Transform Your Green Space Management?
           </h2>
-          <p className="text-green-50 max-w-2xl mx-auto">Join thousands of professionals who trust FlorAI.</p>
           <Link href="/signup">
             <Button className="w-full max-w-sm mx-auto bg-white text-green-600 hover:bg-green-50">Sign Up for Free</Button>
           </Link>
-          <p className="text-xs text-green-100">No credit card required.</p>
         </div>
       </section>
 
@@ -115,28 +111,7 @@ export default function Home() {
           </div>
           <div className="grid grid-cols-2 gap-10 sm:grid-cols-3 text-sm">
             <div>
-              <h4 className="font-medium">Company</h4>
-              <ul className="space-y-2 mt-2">
-                <li><Link href="#" className="text-gray-500 hover:underline">About</Link></li>
-                <li><Link href="#" className="text-gray-500 hover:underline">Careers</Link></li>
-                <li><Link href="#" className="text-gray-500 hover:underline">Contact</Link></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-medium">Resources</h4>
-              <ul className="space-y-2 mt-2">
-                <li><Link href="#" className="text-gray-500 hover:underline">Docs</Link></li>
-                <li><Link href="#" className="text-gray-500 hover:underline">Help Center</Link></li>
-                <li><Link href="#" className="text-gray-500 hover:underline">Blog</Link></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-medium">Legal</h4>
-              <ul className="space-y-2 mt-2">
-                <li><Link href="#" className="text-gray-500 hover:underline">Privacy</Link></li>
-                <li><Link href="#" className="text-gray-500 hover:underline">Terms</Link></li>
-                <li><Link href="#" className="text-gray-500 hover:underline">Cookies</Link></li>
-              </ul>
+
             </div>
           </div>
         </div>
