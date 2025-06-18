@@ -73,7 +73,7 @@ export default function LoginPage() {
             <div className="flex items-center justify-between">
               <Label htmlFor="password">Password</Label>
               <Link
-                href="#"
+                href="/forgotPassword"
                 className="text-xs text-green-600 hover:underline"
               >
                 Forgot password?
@@ -104,12 +104,6 @@ export default function LoginPage() {
                 </span>
               </Button>
             </div>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Checkbox id="remember" />
-            <Label htmlFor="remember" className="text-sm font-normal">
-              Remember me for 30 days
-            </Label>
           </div>
         </CardContent>
         <CardFooter className="flex flex-col space-y-4">

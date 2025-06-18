@@ -1,29 +1,47 @@
-// src/components/FavouriteList.tsx
-import React from "react";
+// src/app/diary/components/FavouriteList.tsx
+
+"use client";
+
 import { DiaryEntry } from "@/app/diary/types";
+import { ChevronRight } from "lucide-react"; // optional icon
 
-type Props = {
+interface FavouriteListProps {
   entries: DiaryEntry[];
-  onSelect: (id: string) => void;
-};
+  onSelect?: (id: string) => void;
+}
 
-export default function FavouriteList({ entries, onSelect }: Props) {
-  const favourites = entries.filter((e) => e.isFavourite);
+export default function FavouriteList({
+  entries,
+  onSelect,
+}: FavouriteListProps) {
+  const favourites = entries.filter((entry) => entry.isFavourite);
+
+  if (favourites.length === 0) {
+    return (
+      <div className="bg-white p-4 rounded-lg shadow text-sm text-gray-500">
+        No favourite entries yet.
+      </div>
+    );
+  }
 
   return (
-    <ul className="space-y-2">
-      {favourites.length === 0 && (
-        <li className="text-gray-500 text-sm">No favourites yet</li>
-      )}
-      {favourites.map((entry) => (
-        <li
-          key={entry.id}
-          className="cursor-pointer text-green-700 hover:underline"
-          onClick={() => onSelect(entry.id)}
-        >
-          {entry.title || `Entry on ${entry.date}`}
-        </li>
-      ))}
-    </ul>
+    <div className="bg-white p-4 rounded-lg shadow max-h-64 overflow-y-auto">
+      <ul className="divide-y divide-gray-200">
+        {favourites.map((entry) => (
+          <li key={entry.id} className="py-2">
+            <button
+              onClick={() => onSelect?.(entry.id)}
+              className="w-full flex items-center justify-between text-left text-sm text-green-700 hover:underline"
+            >
+              <div>
+                <div className="font-medium">{entry.title || "Untitled Entry"}</div>
+                <div className="text-xs text-gray-500">{entry.date}</div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-gray-400" />
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }

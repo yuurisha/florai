@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { Leaf } from "lucide-react";
 
 const links = [
   { href: "/home", label: "Home" },
@@ -20,7 +21,10 @@ export default function TopNavbar() {
   return (
     <nav className="w-full bg-green-600 text-white shadow">
       <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-        <div className="text-xl font-bold">FlorAI</div>
+        <div className="flex items-center gap-2">
+  <Leaf className="w-6 h-6 text-white" />
+  <span className="text-white font-bold text-xl">FlorAI</span>
+</div>
         <ul className="flex space-x-4">
           {links.map((link) => (
             <li key={link.href}>

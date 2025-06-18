@@ -1,46 +1,92 @@
-// src/components/EntryCard.tsx
-import React from "react";
-import { DiaryEntry } from "@/app/diary/types";
+// src/app/diary/components/EntryCard.tsx
 
-type Props = DiaryEntry & {
-  onEdit: () => void;
-  onDelete: () => void;
-  onToggleFavourite: () => void;
-};
+"use client";
+
+import { Heart, Pencil, Trash2 } from "lucide-react";
+import Image from "next/image";
+
+interface EntryCardProps {
+  id: string;
+  date: string;
+  title?: string;
+  text: string;
+  imageUrl?: string;
+  isFavourite?: boolean;
+  onEdit?: () => void;
+  onDelete?: () => void;
+  onToggleFavourite?: () => void;
+}
 
 export default function EntryCard({
+  id,
+  date,
   title,
   text,
   imageUrl,
-  date,
   isFavourite,
   onEdit,
   onDelete,
   onToggleFavourite,
-}: Props) {
+}: EntryCardProps) {
   return (
-    <div className="bg-white border rounded-lg p-6 shadow space-y-4">
-      <div className="flex justify-between items-start">
-        <div>
-          <h2 className="text-xl font-semibold">{title || `Entry on ${date}`}</h2>
-          <p className="text-sm text-gray-500">{date}</p>
-        </div>
-        <div className="space-x-2">
-          <button onClick={onEdit} className="text-blue-600 text-sm">Edit</button>
-          <button onClick={onDelete} className="text-red-600 text-sm">Delete</button>
-          <button onClick={onToggleFavourite} className="text-yellow-500 text-sm">
-            {isFavourite ? "★" : "☆"}
-          </button>
-        </div>
+    <div className="bg-white p-4 rounded-lg shadow space-y-3">
+      <div>
+        <p className="text-sm text-gray-400">{date}</p>
+       <h3 className="font-semibold text-lg">
+        {title || "Untitled Observation"}
+      </h3>
       </div>
-      <p className="text-gray-700 whitespace-pre-wrap">{text}</p>
+
+      <p className="text-sm text-gray-700 whitespace-pre-line">{text}</p>
+
       {imageUrl && (
-        <img
-          src={imageUrl}
-          alt="Diary Visual"
-          className="rounded-lg max-w-full mt-2"
-        />
+        <div className="relative w-full max-w-sm">
+          <Image
+            src={imageUrl}
+            alt="Diary image"
+            width={400}
+            height={300}
+            className="rounded-lg border"
+          />
+        </div>
       )}
+
+      <div className="flex justify-end flex-wrap gap-2 pt-2">
+        {onToggleFavourite && (
+          <button
+            onClick={onToggleFavourite}
+            className={`flex items-center gap-1 px-3 py-1 text-sm border rounded-md hover:bg-gray-100 ${
+              isFavourite
+                ? "text-red-500 border-red-200"
+                : "text-gray-500 border-gray-300"
+            }`}
+          >
+            <Heart
+              className="w-4 h-4"
+              fill={isFavourite ? "currentColor" : "none"}
+            />
+            {isFavourite ? "Unfavourite" : "Favourite"}
+          </button>
+        )}
+        {onEdit && (
+          <button
+            onClick={onEdit}
+            className="flex items-center gap-1 px-3 py-1 text-sm border rounded-md hover:bg-gray-100"
+          >
+            <Pencil className="w-4 h-4" />
+            Edit
+          </button>
+        )}
+        {onDelete && (
+          <button
+            onClick={onDelete}
+            className="flex items-center gap-1 px-3 py-1 text-sm text-red-600 border border-red-300 rounded-md hover:bg-red-50"
+          >
+            <Trash2 className="w-4 h-4" />
+            Delete
+          </button>
+        )}
+      </div>
     </div>
   );
 }

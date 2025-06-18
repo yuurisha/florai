@@ -3,16 +3,20 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createUserWithEmailAndPassword } from "firebase/auth";
 import { Leaf, Eye, EyeOff } from "lucide-react";
 
-import { auth } from "@/lib/firebaseConfig"; // Make sure this path is correct
+import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
+import { auth } from "@/lib/firebaseConfig"; 
+import { doc, setDoc } from "firebase/firestore";
+import { db } from "@/lib/firebaseConfig";
+
 import Button from "@/components/button";
 import { Input } from "@/components/input";
 import { Label } from "@/components/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/card";
 
 export default function SignUpPage() {
+  
   const [showPassword, setShowPassword] = useState(false);
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -23,21 +27,32 @@ export default function SignUpPage() {
 
   const togglePasswordVisibility = () => setShowPassword(!showPassword);
 
-  const handleSignUp = async () => {
-    setError("");
-    if (!email || !password || !fullName || !role) {
-      setError("All fields are required.");
-      return;
-    }
+const handleSignUp = async () => {
+  setError("");
 
-    try {
-      await createUserWithEmailAndPassword(auth, email, password);
-      // Optional: Save fullName and role to Firestore here
-      router.push("/home");
-    } catch (err: any) {
-      setError(err.message || "Something went wrong.");
-    }
-  };
+  if (!email || !password || !fullName || !role) {
+    setError("All fields are required.");
+    return;
+  }
+
+  try {
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    const user = userCredential.user;
+
+    await updateProfile(user, { displayName: fullName });
+    // Save to Firestore
+    await setDoc(doc(db, "users", user.uid), {
+      fullName,
+      email,
+      role: "user",
+      createdAt: new Date(),
+    });
+
+    router.push("/home");
+  } catch (err: any) {
+    setError(err.message || "Something went wrong.");
+  }
+};
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-green-50 p-4">

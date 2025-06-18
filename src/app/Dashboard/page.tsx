@@ -20,13 +20,16 @@ import {
   Menu,
 } from "lucide-react";
 
-import Button from "@/components/button";
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/card";
 import { Input } from "@/components/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/tabs";
 
 import MapViewer from "@/components/MapViewer";
 import TopNavBar from "@/components/TopNavBar";
+import router from "next/router";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth } from "@/lib/firebaseConfig";
 
 export default function DashboardPage() {
   const [isMobile, setIsMobile] = useState(false);
@@ -42,6 +45,19 @@ export default function DashboardPage() {
     riskLevel: "--",
     spreadDistance: "--",
   });
+
+
+  //handle user session auth explicitly
+  
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (!user) {
+        // User is not signed in, redirect to login
+        window.location.href = "/login";
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
     const checkIsMobile = () => {
@@ -123,7 +139,7 @@ export default function DashboardPage() {
 
           <Tabs defaultValue="map">
             <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="map">Predict Invasive Plant Risk</TabsTrigger>
+              <TabsTrigger value="map">Invasive Plant Risk Prediction</TabsTrigger>
               <TabsTrigger value="weather">Upload Plant Image</TabsTrigger>
               <TabsTrigger value="plants">Plant Health Prediction</TabsTrigger>
             </TabsList>
