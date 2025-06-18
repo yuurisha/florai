@@ -1,7 +1,9 @@
-// src/components/FavouriteList.tsx
-import React from "react";
-import { DiaryEntry } from "@/app/diary/types";
-import { ChevronRight } from "lucide-react";
+// src/app/diary/components/FavouriteList.tsx
+
+"use client";
+
+import { DiaryEntry } from "../types";
+import { ChevronRight } from "lucide-react"; // optional icon
 
 interface FavouriteListProps {
   entries: DiaryEntry[];
