@@ -7,10 +7,10 @@ import { ShieldCheck } from "lucide-react";
 
 const adminLinks = [
   { href: "/admin", label: "Admin Home" },
-  { href: "/admin/users", label: "Manage Users" },
-  { href: "/admin/posts", label: "Manage Posts" },
+  { href: "/admin/manage-user", label: "Manage Users" },
+  { href: "/admin/manage-post", label: "Manage Posts" },
   { href: "/manage-survey", label: "Upload Survey" },
-  { href: "/admin/tips", label: "Upload Tips" },
+  { href: "/admin/manage-resources", label: "Upload Learning Resources" },
 ];
 
 export default function AdminTopNavbar() {

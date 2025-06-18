@@ -10,7 +10,7 @@ import { auth } from "@/lib/firebaseConfig";
 import { doc, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebaseConfig";
 
-import Button from "@/components/button";
+import {Button} from "@/components/button";
 import { Input } from "@/components/input";
 import { Label } from "@/components/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/card";

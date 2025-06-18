@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Leaf, Eye, EyeOff } from "lucide-react";
 
-import Button from "@/components/button";
+import {Button} from "@/components/button";
 import { Input } from "@/components/input";
 import { Label } from "@/components/label";
 import {
@@ -20,6 +20,7 @@ import { Checkbox } from "@/components/checkbox";
 
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "@/lib/firebaseConfig";
+import { getUserRole } from "@/controller/userController";
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
@@ -34,7 +35,12 @@ export default function LoginPage() {
   const handleLogin = async () => {
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      router.push("/home");
+      const role = await getUserRole();
+      if (role === "admin") {
+      router.push("/admin");
+      } else {
+  router.push("/home");
+    }
     } catch (error) {
       console.error("Login failed:", error);
       alert("Login failed. Please check your credentials.");

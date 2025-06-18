@@ -1,3 +1,5 @@
+//asdmin home
+
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -10,21 +12,21 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
 
-  // useEffect(() => {
-  //   const checkRole = async () => {
-  //     const role = await getUserRole();
-  //     if (role === "admin") {
-  //       setIsAdmin(true);
-  //     } else {
-  //       router.push("/login"); // or any fallback
-  //     }
-  //     setLoading(false);
-  //   };
+  useEffect(() => {
+    const checkRole = async () => {
+      const role = await getUserRole();
+      if (role === "admin") {
+        setIsAdmin(true);
+      } else {
+        router.push("/login"); // or any fallback
+      }
+      setLoading(false);
+    };
 
-  //   checkRole();
-  // }, []);
+    checkRole();
+  }, []);
 
-  // if (loading) return <div>Checking access...</div>;
+  if (loading) return <div>Checking access...</div>;
 
   return (
     <div className="p-6">
