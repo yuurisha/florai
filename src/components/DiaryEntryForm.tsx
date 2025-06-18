@@ -30,9 +30,16 @@ export default function DiaryEntryForm({
   const [imageUrl, setImageUrl] = useState(initialImageUrl || "");
   const [fav, setFav] = useState(isFavourite);
 
+  const MAX_FILE_SIZE = 300 * 1024; // 300 KB
+
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (file.size > MAX_FILE_SIZE) {
+        alert("Image is too large. Please upload one smaller than 300KB.");
+        return;
+      }
+
       const reader = new FileReader();
       reader.onload = () => setImageUrl(reader.result as string);
       reader.readAsDataURL(file);
@@ -46,7 +53,7 @@ export default function DiaryEntryForm({
   };
 
   return (
-    <div className="bg-white p-4 rounded-lg shadow space-y-4">
+    <div className="bg-white p-4 rounded-lg shadow space-y-4 max-h-[80vh] overflow-y-auto">
       <h2 className="text-lg font-semibold">Entry for {date}</h2>
 
       <input
@@ -82,16 +89,22 @@ export default function DiaryEntryForm({
       </div>
 
       {imageUrl && (
-        <div className="relative w-full max-w-xs">
-          <Image
+        <div className="relative w-full max-w-xs space-y-2">
+          <img
             src={imageUrl}
-            alt="Uploaded"
-            width={300}
-            height={200}
-            className="rounded-lg border"
+            alt="Uploaded Preview"
+            className="rounded-lg border max-h-64 object-cover w-full"
           />
+          <button
+            type="button"
+            onClick={() => setImageUrl("")}
+            className="text-red-500 text-sm underline hover:text-red-700"
+          >
+            Remove Image
+          </button>
         </div>
       )}
+
 
       <div className="flex justify-end gap-2">
         {onCancel && (
