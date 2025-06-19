@@ -1,0 +1,37 @@
+from fastapi import FastAPI
+from pydantic import BaseModel
+import joblib
+import numpy as np
+
+app = FastAPI()
+model = joblib.load("spread_model.pkl") #risk level model
+spread_model = joblib.load("area_spread_model.pkl")  # distance/direction model
+
+
+class InputPoint(BaseModel):
+    latitude: float
+    longitude: float
+    temperature: float
+    rainfall: float
+    humidity: float
+
+@app.post("/predict")
+def predict_spread(point: InputPoint):
+    print("Received input:", point.dict())  # ✅ Debug log
+    X = np.array([[point.latitude, point.longitude, point.temperature, point.rainfall, point.humidity]])
+    label = model.predict(X)[0]
+    risk_map = {0: "Low", 1: "Medium", 2: "High"}
+    return {"risk_level": risk_map[label]}
+
+@app.post("/predictSpread")
+def predict_spread_details(point: InputPoint):
+    X = np.array([[point.latitude, point.longitude, point.temperature, point.rainfall, point.humidity]])
+    prediction = spread_model.predict(X)[0]
+    return {
+        "spread_distance_km": round(prediction[0], 2),
+        "spread_direction_deg": round(prediction[1] % 360, 2)
+    }
+
+
+# To run the server, use the command:
+# uvicorn app:app --reload
