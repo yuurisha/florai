@@ -4,7 +4,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { ArrowRight, Leaf, MapPin, Cloud, BarChart3 } from "lucide-react";
-import  Button from "@/components/button";
+import  {Button} from "@/components/button";
 
 export default function Home() {
   return (
