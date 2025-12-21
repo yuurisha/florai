@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import MapClient from "@/components/MapClient"; // Adjust the path based on where your file is
 import Link from "next/link";
 import {
   Download,
@@ -214,6 +215,22 @@ export default function DashboardPage() {
                   setIsLoading={setIsLoading}
                   setRetryFn={setRetryFn}
                   />
+                </CardContent>
+              </Card>
+            </TabsContent>
+            <TabsContent value="weather" className="mt-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Upload Plant Image on Map</CardTitle>
+                  <CardDescription>
+                    Select a hibiscus zone on the map, then upload a plant image for analysis.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="p-0">
+                  {/* Reuse the same map page logic here */}
+                  <div className="h-[70vh] w-full">
+                    <MapClient mode="user" />
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>
