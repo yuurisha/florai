@@ -95,7 +95,7 @@ const MapViewer = ({
   const [heatPoints, setHeatPoints] = useState<[number, number, number][]>([]);
   const clickLocked = useRef(false);
 
-  const apiKey = "2bf9dfdb74441da8e8cc8fb887d2ceec";
+  const apiKey = "OPENWEATHERAPIKEY";
 
   // Debounce clicks to prevent spamming predictions
   function debounceClick(callback: () => void, delay = 800) {
