@@ -2,7 +2,7 @@ import requests
 import logging
 from datetime import datetime
 
-OPENWEATHER_API_KEY = "2bf9dfdb74441da8e8cc8fb887d2ceec"
+OPENWEATHER_API_KEY = "OPENWEATHERAPIKEY"
 
 # Pick a representative point inside UM (central point)
 UM_WEATHER_POINT = {
@@ -49,3 +49,4 @@ def get_um_hourly_weather():
     _cached_hour = current_hour
 
     return weather
+
