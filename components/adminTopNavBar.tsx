@@ -12,6 +12,7 @@ const adminLinks = [
   { href: "/admin/manage-user", label: "Manage Users" },
   { href: "/admin/manage-post", label: "Manage Posts" },
   { href: "/admin/manage-events", label: "Manage Events" },
+  { href: "/admin/manage-map", label: "Manage Map" },
   { href: "/manage-survey", label: "Upload Survey" },
   { href: "/admin/manage-resources", label: "Upload Learning Resources" },
 ];

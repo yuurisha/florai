@@ -1,112 +1,132 @@
-// src/app/diary/components/DiaryEntryForm.tsx
-
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
 import { Heart } from "lucide-react";
+import { PlantCondition } from "@/app/diary/types";
 
-interface DiaryEntryFormProps {
+type Props = {
   date: string;
   initialTitle?: string;
   initialText?: string;
-  initialImageUrl?: string;
   isFavourite?: boolean;
-  onSave: (data: { title: string; text: string; imageUrl?: string; isFavourite: boolean }) => void;
-  onCancel?: () => void;
-}
+  initialPlantName?: string;
+  initialPlantCondition?: PlantCondition;
+  onSave: (data: {
+    title: string;
+    text: string;
+    isFavourite: boolean;
+    plantName?: string;
+    plantCondition?: PlantCondition;
+  }) => void;
+  onCancel: () => void;
+};
 
 export default function DiaryEntryForm({
   date,
   initialTitle = "",
   initialText = "",
-  initialImageUrl,
   isFavourite = false,
+  initialPlantName = "",
+  initialPlantCondition = "Not sure",
   onSave,
   onCancel,
-}: DiaryEntryFormProps) {
-  const [title, setTitle] = useState(initialTitle || "");
+}: Props) {
+  const [title, setTitle] = useState(initialTitle);
   const [text, setText] = useState(initialText);
-  const [imageUrl, setImageUrl] = useState(initialImageUrl || "");
   const [fav, setFav] = useState(isFavourite);
-
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = () => setImageUrl(reader.result as string);
-      reader.readAsDataURL(file);
-    }
-  };
+  const [plantName, setPlantName] = useState(initialPlantName);
+  const [plantCondition, setPlantCondition] =
+    useState<PlantCondition>(initialPlantCondition);
 
   const handleSubmit = () => {
-    if (text.trim()) {
-      onSave({ title, text, imageUrl, isFavourite: fav });
-    }
+    if (!text.trim()) return;
+    onSave({
+      title: title.trim(),
+      text,
+      isFavourite: fav,
+      plantName: plantName.trim() || undefined,
+      plantCondition,
+    });
   };
 
   return (
-    <div className="bg-white p-4 rounded-lg shadow space-y-4">
-      <h2 className="text-lg font-semibold">Entry for {date}</h2>
+    <div className="space-y-4">
+      <div className="rounded-2xl border border-gray-200 p-4 bg-white">
+        <p className="text-sm text-gray-500">Entry date</p>
+        <p className="text-base font-semibold text-gray-900">{date}</p>
+      </div>
 
-      <input
-        type="text"
-        className="w-full border border-gray-300 rounded-md p-2 text-sm"
-        placeholder="Enter a title for your entry..."
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-      />
-      <textarea
-        className="w-full border border-gray-300 rounded-md p-2 text-sm min-h-[120px]"
-        placeholder="Write your plant observation..."
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-      />
+      <div className="rounded-2xl border border-gray-200 p-4 bg-white space-y-3">
+        <p className="text-sm font-semibold text-gray-900">Plant of the Day</p>
 
-      <div className="flex items-center gap-4">
-        <label className="cursor-pointer bg-gray-100 px-3 py-1 rounded-md border border-gray-300 text-sm hover:bg-gray-200">
-          Upload Image
-          <input type="file" accept="image/*" onChange={handleImageUpload} hidden />
-        </label>
+        <input
+          value={plantName}
+          onChange={(e) => setPlantName(e.target.value)}
+          placeholder="Plant name (e.g. Hibiscus)"
+          className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-green-200"
+        />
+
+        <div className="flex flex-wrap gap-2">
+          {(["Healthy", "A bit dry", "Diseased", "Not sure"] as PlantCondition[]).map(
+            (label) => (
+              <button
+                key={label}
+                type="button"
+                onClick={() => setPlantCondition(label)}
+                className={`rounded-full px-3 py-1 text-xs border transition ${
+                  plantCondition === label
+                    ? "bg-green-600 text-white border-green-600"
+                    : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
+                }`}
+              >
+                {label}
+              </button>
+            )
+          )}
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-gray-200 p-4 bg-white space-y-3">
+        <input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="Title (optional)"
+          className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-green-200"
+        />
+
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="Write your observation..."
+          className="w-full min-h-[140px] rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-green-200"
+        />
 
         <button
           type="button"
-          onClick={() => setFav(!fav)}
-          className={`flex items-center gap-1 text-sm ${
-            fav ? "text-red-500" : "text-gray-400"
+          onClick={() => setFav((v) => !v)}
+          className={`inline-flex items-center gap-2 text-sm px-3 py-2 rounded-xl border transition ${
+            fav
+              ? "text-red-600 border-red-200 bg-red-50"
+              : "text-gray-600 border-gray-200 bg-white hover:bg-gray-50"
           }`}
         >
-          <Heart className="w-4 h-4" fill={fav ? "currentColor" : "none"} />
-          {fav ? "Favourited" : "Mark as Favourite"}
+          <Heart className="h-4 w-4" fill={fav ? "currentColor" : "none"} />
+          {fav ? "Favourited" : "Mark as favourite"}
         </button>
       </div>
 
-      {imageUrl && (
-        <div className="relative w-full max-w-xs">
-          <Image
-            src={imageUrl}
-            alt="Uploaded"
-            width={300}
-            height={200}
-            className="rounded-lg border"
-          />
-        </div>
-      )}
-
       <div className="flex justify-end gap-2">
-        {onCancel && (
-          <button
-            onClick={onCancel}
-            className="px-4 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-100"
-          >
-            Cancel
-          </button>
-        )}
+        <button
+          onClick={onCancel}
+          className="rounded-xl border border-gray-200 px-4 py-2 text-sm hover:bg-gray-50"
+        >
+          Cancel
+        </button>
         <button
           onClick={handleSubmit}
-          className="px-4 py-1 bg-green-600 text-white text-sm rounded-md hover:bg-green-700"
+          className="rounded-xl bg-green-600 px-4 py-2 text-sm text-white hover:bg-green-700"
         >
-          Save Entry
+          Save entry
         </button>
       </div>
     </div>
