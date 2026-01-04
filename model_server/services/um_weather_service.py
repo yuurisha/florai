@@ -1,8 +1,9 @@
+from concurrent.futures import process
 import requests
 import logging
 from datetime import datetime
 
-OPENWEATHER_API_KEY = "OPENWEATHERAPIKEY"
+OPENWEATHER_API_KEY = process.env.NEXT_PUBLIC_OPENWEATHER_API_KEY
 
 # Pick a representative point inside UM (central point)
 UM_WEATHER_POINT = {
