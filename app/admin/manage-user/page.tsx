@@ -4,7 +4,9 @@ import React, { useEffect, useMemo, useState } from "react";
 import AdminTopNavbar from "@/components/adminTopNavBar";
 import { getUserRole, adminRemoveUser } from "@/controller/userController";
 import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
-import { db } from "@/lib/firebaseConfig";
+import { onAuthStateChanged } from "firebase/auth";
+import { db, auth } from "@/lib/firebaseConfig";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import toast from "react-hot-toast";
 
 type UserRow = {
@@ -17,6 +19,8 @@ type UserRow = {
 };
 
 export default function AdminUsersPage() {
+  const router = useRouter();
+  const pathname = usePathname();
   const [loadingAccess, setLoadingAccess] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
 
@@ -30,20 +34,33 @@ export default function AdminUsersPage() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserRow | null>(null);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const role = await getUserRole();
-        setIsAdmin(role === "admin");
-      } catch (e: any) {
-        console.error("getUserRole failed:", e);
-        toast.error(e?.message ?? "Access check failed. Please try again.");
-        setIsAdmin(false);
-      } finally {
-        setLoadingAccess(false);
-      }
-    })();
-  }, []);
+  const searchParams = useSearchParams();
+  const uidParam = searchParams.get("uid");
+  const [highlightUid, setHighlightUid] = useState<string | null>(null);
+
+useEffect(() => {
+  const unsub = onAuthStateChanged(auth, async (user) => {
+    if (!user) {
+      setIsAdmin(false);
+      setLoadingAccess(false);
+      return;
+    }
+
+    try {
+      const role = await getUserRole(); // or getUserRole(user.uid) if your controller supports it
+      setIsAdmin(role === "admin");
+    } catch (e: any) {
+      console.error("getUserRole failed:", e);
+      setIsAdmin(false);
+      toast.error(e?.message ?? "Access check failed. Please try again.");
+    } finally {
+      setLoadingAccess(false);
+    }
+  });
+
+  return () => unsub();
+}, []);
+
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -67,6 +84,16 @@ export default function AdminUsersPage() {
 
     return () => unsub();
   }, [isAdmin]);
+
+useEffect(() => {
+  if (!uidParam) return;
+
+  setSearch(uidParam);
+  setHighlightUid(uidParam);
+  router.replace(pathname);
+}, [uidParam, router, pathname]);
+
+
 
   const filteredUsers = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -156,7 +183,7 @@ export default function AdminUsersPage() {
                   </thead>
                   <tbody className="divide-y">
                     {filteredUsers.map((u) => (
-                      <tr key={u.id} className="bg-white">
+                      <tr key={u.id} className={highlightUid === u.id ? "bg-yellow-50" : "bg-white"}>
                         <td className="px-4 py-3 text-gray-800 font-semibold">
                           {u.name ?? u.fullName ?? "-"}
                         </td>

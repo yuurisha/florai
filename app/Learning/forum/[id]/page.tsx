@@ -23,6 +23,7 @@ console.log("Edit Modal component:", EditPostModal);
 // 
 import { Post, Reply } from "../../../../models/Post";
 import { onAuthStateChanged } from "firebase/auth";
+import ReportModal from "@/components/reportModal";
 
 
 
@@ -36,6 +37,8 @@ export default function ReadDiscussionPage() {
   const [reply, setReply] = useState<string>("");
   const [showConfirm, setShowConfirm] = useState(false); 
   const [showEdit, setShowEdit] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportTarget, setReportTarget] = useState<{ type: "forum" | "user"; id: string } | null>(null);
 
     //handle user session auth explicitly
     
@@ -155,14 +158,34 @@ const handleEditSave = async (updatedContent: string) => {
               {post.content}
             </p>
 
+            <button
+              className="rounded border px-3 py-2 text-xs"
+              onClick={() => {
+                setReportTarget({ type: "forum", id: post.id || "" });
+                setReportOpen(true);
+              }}
+            >
+              Report Post
+            </button>
+
+            <button
+              className="rounded border px-3 py-2 text-xs"
+              onClick={() => {
+                setReportTarget({ type: "user", id: post.userId });
+                setReportOpen(true);
+              }}
+            >
+              Report User
+            </button>
+
             {isPostOwner && (
               <div className="mt-4 flex gap-2">
                 <Button
-  className="bg-blue-500 hover:bg-blue-600 text-white"
-  onClick={() => router.push(`/Learning/forum/editPost/${post.id}`)}
->
-  Edit
-</Button>
+                className="bg-blue-500 hover:bg-blue-600 text-white"
+                onClick={() => router.push(`/Learning/forum/editPost/${post.id}`)}
+              >
+                Edit
+              </Button>
                 <Button
                   className="bg-red-500 hover:bg-red-600 text-white"
                   onClick={handleDelete}
@@ -236,42 +259,16 @@ const handleEditSave = async (updatedContent: string) => {
               ))}
             </div>
           </div>
-
-          <div className="bg-white p-4 rounded-lg shadow">
-            <h3 className="font-semibold text-sm text-gray-700 mb-2">About the Author</h3>
-            <div className="flex items-center gap-3 mb-2">
-              <Image
-                src="/avatar1.png"
-                alt="avatar"
-                width={40}
-                height={40}
-                className="rounded-full"
-              />
-              <div>
-                <p className="text-sm font-medium">{post.author}</p>
-                <p className="text-xs text-gray-500">Discussion Enthusiast</p>
-              </div>
-            </div>
-            <p className="text-xs text-gray-600">
-              Leading researcher with a passion for fostering green tech advancement.
-            </p>
-          </div>
-
-          <div className="bg-white p-4 rounded-lg shadow">
-            <h3 className="font-semibold text-sm text-gray-700 mb-2">Related Discussions</h3>
-            <ul className="space-y-2 text-sm text-green-700">
-              <li>
-                <a href="#" className="hover:underline">Can we plant anywhere?</a>
-              </li>
-              <li>
-                <a href="#" className="hover:underline">Why we should care about biodiversity</a>
-              </li>
-              <li>
-                <a href="#" className="hover:underline">I find it hard to maintain my plants</a>
-              </li>
-            </ul>
-          </div>
         </aside>
+        <ReportModal
+          open={reportOpen}
+          onClose={() => {
+            setReportOpen(false);
+            setReportTarget(null);
+          }}
+          targetType={reportTarget?.type ?? "forum"}
+          targetId={reportTarget?.id ?? ""}
+        />
       </div>
     </>
   );

@@ -23,16 +23,25 @@ import {
   fetchApprovedEvents,
   toggleEventInterest,
 } from "../../../controller/eventController"
+import ReportModal from "@/components/reportModal";
 import { auth } from "../../../lib/firebaseConfig"
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
+
 
 export default function EventsPage() {
   const [events, setEvents] = useState<Event[]>([])
   const [filteredEvents, setFilteredEvents] = useState<Event[]>([])
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
-
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportTargetEventId, setReportTargetEventId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("")
   const [categoryFilter, setCategoryFilter] = useState<string>("all")
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const eventIdParam = searchParams.get("eventId");
+
 
   /* =========================
      Load events from Firestore
@@ -43,6 +52,14 @@ export default function EventsPage() {
         const data = await fetchApprovedEvents()
         setEvents(data)
         setFilteredEvents(data)
+        if (eventIdParam) {
+            const found = data.find((e) => e.id === eventIdParam);
+            if (found) {
+              setSelectedEvent(found);
+              setIsModalOpen(true);
+            }
+            router.replace(pathname); // remove ?eventId so refresh becomes normal
+          }
       } catch (err) {
         console.error(err)
         toast.error("Failed to load events.")
@@ -200,6 +217,10 @@ export default function EventsPage() {
                 }}
                 onInterestChange={handleInterestChange}
                 userInterestStatus={getUserInterestStatus(event)}
+                onReport={() => {
+                  setReportTargetEventId(event.id);
+                  setReportOpen(true);
+                }}
               />
             ))}
           </div>
@@ -232,6 +253,15 @@ export default function EventsPage() {
           userInterestStatus={
             selectedEvent ? getUserInterestStatus(selectedEvent) : "none"
           }
+        />
+        <ReportModal
+          open={reportOpen}
+          onClose={() => {
+            setReportOpen(false);
+            setReportTargetEventId(null);
+          }}
+          targetType="event"
+          targetId={reportTargetEventId ?? ""}
         />
       </div>
     </div>
