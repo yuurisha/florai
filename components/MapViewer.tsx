@@ -61,10 +61,13 @@ const HeatmapLayer = ({ points }: { points: [number, number, number][] }) => {
       maxZoom: 17,
       minOpacity: 0.4,
       gradient: {
-        0.2: "green",
-        0.5: "orange",
-        0.8: "red",
-      },
+      0.0: "green",
+      0.33: "green",
+      0.34: "orange",
+      0.66: "orange",
+      0.67: "red",
+      1.0: "red",
+    },
     }).addTo(map);
 
     return () => {
@@ -95,7 +98,7 @@ const MapViewer = ({
   const [heatPoints, setHeatPoints] = useState<[number, number, number][]>([]);
   const clickLocked = useRef(false);
 
-  const apiKey = "OPENWEATHERAPIKEY";
+  const apiKey = "2bf9dfdb74441da8e8cc8fb887d2ceec";
 
   // Debounce clicks to prevent spamming predictions
   function debounceClick(callback: () => void, delay = 800) {
@@ -166,11 +169,16 @@ const MapViewer = ({
             const gridLon = lon + j * delta;
             const isCenter = i === 0 && j === 0;
 
+            const source = isCenter ? "user_clicked_point" : "user_click_remaining_grid";
+
             const res = await fetch("/api/predictAll", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 userID: isCenter ? userID : null,
+                source: isCenter ? "user_clicked_point" : "user_click_remaining_grid",
+                save: isCenter,          // ✅ only center stored
+                createAlert: isCenter,   // ✅ only center alerts
                 latitude: gridLat,
                 longitude: gridLon,
                 temperature,
@@ -191,11 +199,14 @@ const MapViewer = ({
               });
             }
 
+            function riskToIntensity(risk: string) {
+              if (risk === "High") return 0.85;
+              if (risk === "Medium") return 0.55;
+              return 0.25; // Low (default)
+            }
+
             // Heatmap intensity
-            let intensity = 0.2;
-            if (risk_level === "Medium") intensity = 0.5;
-            if (risk_level === "High") intensity = 0.8;
-            intensity = Math.min(1, intensity + spread_distance_km / 10);
+            let intensity = riskToIntensity(risk_level);
 
             newPoints.push([gridLat, gridLon, intensity]);
           }

@@ -68,15 +68,15 @@ export function EventDetailsModal({
 
         <div className="space-y-6">
           {/* Event Image */}
-          {event.imageUrl && (
+          {/* {event.imageUrl && (
             <div className="w-full h-48 bg-gray-100 rounded-lg overflow-hidden">
               <img
                 src={event.imageUrl || "/placeholder.svg"}
                 alt={event.title}
                 className="w-full h-full object-cover"
               />
-            </div>
-          )}
+            </div> */}
+          {/* )} */}
 
           {/* Event Details */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

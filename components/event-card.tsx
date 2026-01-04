@@ -10,10 +10,11 @@ interface EventCardProps {
   event: Event
   onViewDetails: (event: Event) => void
   onInterestChange: (eventId: string, status: "interested" | "not-interested") => void
+  onReport: (event: Event) => void
   userInterestStatus: "interested" | "not-interested" | "none"
 }
 
-export function EventCard({ event, onViewDetails, onInterestChange, userInterestStatus }: EventCardProps) {
+export function EventCard({ event, onViewDetails, onInterestChange, userInterestStatus, onReport }: EventCardProps) {
   const getCategoryColor = (category: Event["category"]) => {
     switch (category) {
       case "workshop":
@@ -73,28 +74,43 @@ export function EventCard({ event, onViewDetails, onInterestChange, userInterest
         </div>
 
         <div className="flex gap-2 pt-2">
-          <Button variant="outline" size="sm" onClick={() => onViewDetails(event)} className="flex-1">
-            View Details
-          </Button>
-          <div className="flex gap-1">
-            <Button
-              variant={userInterestStatus === "interested" ? "default" : "outline"}
-              size="sm"
-              onClick={() => onInterestChange(event.id, "interested")}
-              className={userInterestStatus === "interested" ? "bg-emerald-600 hover:bg-emerald-700" : ""}
-            >
-              👍
-            </Button>
-            <Button
-              variant={userInterestStatus === "not-interested" ? "default" : "outline"}
-              size="sm"
-              onClick={() => onInterestChange(event.id, "not-interested")}
-              className={userInterestStatus === "not-interested" ? "bg-red-600 hover:bg-red-700" : ""}
-            >
-              👎
-            </Button>
-          </div>
-        </div>
+  <Button
+    variant="outline"
+    size="sm"
+    onClick={() => onViewDetails(event)}
+    className="flex-1"
+  >
+    View Details
+  </Button>
+
+  <Button
+    variant="outline"
+    size="sm"
+    onClick={() => onReport(event)}
+  >
+    Report
+  </Button>
+
+  <div className="flex gap-1">
+    <Button
+      variant={userInterestStatus === "interested" ? "default" : "outline"}
+      size="sm"
+      onClick={() => onInterestChange(event.id, "interested")}
+      className={userInterestStatus === "interested" ? "bg-emerald-600 hover:bg-emerald-700" : ""}
+    >
+      👍
+    </Button>
+    <Button
+      variant={userInterestStatus === "not-interested" ? "default" : "outline"}
+      size="sm"
+      onClick={() => onInterestChange(event.id, "not-interested")}
+      className={userInterestStatus === "not-interested" ? "bg-red-600 hover:bg-red-700" : ""}
+    >
+      👎
+    </Button>
+  </div>
+</div>
+
       </CardContent>
     </Card>
   )

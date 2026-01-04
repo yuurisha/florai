@@ -40,7 +40,7 @@ export async function fetchUserNotifications(userID: string): Promise<Notificati
       channelInApp: true,
     };
 
-// ❌ If user disabled all in-app notifications → return empty
+// If user disabled all in-app notifications → return empty
 if (!prefs.enableAiAlerts || !prefs.channelInApp) {
   return [];
 }
@@ -170,4 +170,35 @@ export async function markAllNotificationsRead(userID: string) {
   });
 
   await Promise.all(updates);
+}
+
+/** -----------------------------
+ * admin notification
+ * ------------------------------ */
+export async function fetchAdminReportNotifications(adminUid: string): Promise<Notification[]> {
+  const notifRef = collection(db, "notifications");
+
+  const q = query(
+    notifRef,
+    where("userID", "==", adminUid),
+    where("type", "==", "user_report"),
+    orderBy("createdAt", "desc")
+  );
+
+  const snap = await getDocs(q);
+
+  return snap.docs.map((d) => {
+    const data = d.data() as any;
+    return {
+      notificationID: d.id,
+      type: data.type,
+      description: data.description,
+      createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : new Date().toISOString(),
+      read: data.read ?? false,
+      receiveNotifications: data.receiveNotifications ?? true,
+      userID: data.userID,
+      reportID: data.reportID ?? undefined,
+      _id: "",
+    } as Notification;
+  });
 }
