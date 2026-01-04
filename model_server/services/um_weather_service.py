@@ -1,8 +1,8 @@
+from concurrent.futures import process
 import requests
 import logging
 from datetime import datetime
 
-OPENWEATHER_API_KEY = "OPENWEATHERAPIKEY"
 
 # Pick a representative point inside UM (central point)
 UM_WEATHER_POINT = {
@@ -29,7 +29,7 @@ def get_um_hourly_weather():
         params={
             "lat": UM_WEATHER_POINT["lat"],
             "lon": UM_WEATHER_POINT["lon"],
-            "appid": OPENWEATHER_API_KEY,
+            "appid": process.env.OPENWEATHER_API_KEY,
             "units": "metric",
         },
         timeout=10,
