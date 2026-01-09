@@ -171,7 +171,9 @@ const MapViewer = ({
 
             const source = isCenter ? "user_clicked_point" : "user_click_remaining_grid";
 
-            const res = await fetch("/api/predictAll", {
+            const MODEL_URL = process.env.MODEL_SERVER_URL;
+
+            const res = await fetch(`${MODEL_URL}/predictAll`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({

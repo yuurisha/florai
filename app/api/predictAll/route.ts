@@ -47,7 +47,14 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
 
-    const fastApiUrl = "http://127.0.0.1:8000/predictAll";
+    const base = process.env.MODEL_SERVER_URL;
+    if (!base) {
+      return new Response(JSON.stringify({ error: "MODEL_SERVER_URL not set" }), {
+        status: 500,
+      });
+    }
+
+    const fastApiUrl = `${base.replace(/\/$/, "")}/predictAll`;
 
     const res = await fetch(fastApiUrl, {
       method: "POST",
@@ -55,20 +62,22 @@ export async function POST(req: Request) {
       body: JSON.stringify(body),
     });
 
-      if (!res.ok) {
-        const errorText = await res.text();
-        console.error("FastAPI error:", errorText);
-        return new Response(JSON.stringify({ error: "Prediction failed" }), { status: res.status });
-      }
+    const text = await res.text();
 
-    const result = await res.json();
+    if (!res.ok) {
+      console.error("FastAPI error:", text);
+      return new Response(JSON.stringify({ error: "Prediction failed", details: text }), {
+        status: res.status,
+      });
+    }
 
-    // Log output
-    console.log("🧪 Combined FastAPI Result:", result);
-
-    return Response.json(result);
+    return new Response(text, {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
   } catch (err) {
     console.error("❌ predictAll route crashed:", err);
     return new Response(JSON.stringify({ error: "Unexpected error" }), { status: 500 });
   }
 }
+
