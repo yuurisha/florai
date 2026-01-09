@@ -25,6 +25,10 @@ class InputPoint(BaseModel):
     rainfall: float
     humidity: float
     userID: str | None = None
+    source: str | None = None            # "user_clicked_point" | "user_click_grid" | "scheduled_um"
+    save: bool = False                   # save to Firestore?
+    createAlert: bool = False            # create notification?
+
 
 @app.post("/predict")
 def predict_spread(point: InputPoint):
@@ -54,22 +58,29 @@ def predict_all(point: InputPoint):
     # 2) Predict spread
     spread_pred = spread_model.predict(X)[0]
     spread = {
-        "spread_distance_km": round(spread_pred[0], 2),
-        "spread_direction_deg": round(spread_pred[1] % 360, 2)
+        "spread_distance_km": round(float(spread_pred[0]), 2),
+        "spread_direction_deg": round(float(spread_pred[1] % 360), 2)
     }
 
-    # 3) Save prediction in Firestore
-    prediction_id = save_prediction_to_firestore(point, risk, spread)
+    prediction_id = None
 
-    # 4) Create AI alert 
-    create_ai_alert(prediction_id, point, risk, spread)
+    # ✅ 3) Save ONLY when explicitly requested (center point)
+    if point.save:
+        # Safety: don't silently lie about source
+        if not point.source:
+            point.source = "unknown"
+        prediction_id = save_prediction_to_firestore(point, risk, spread)
+
+    # ✅ 4) Create alert ONLY when allowed and we actually saved
+    if point.createAlert and prediction_id and point.userID:
+        create_ai_alert(prediction_id, point, risk, spread)
 
     # 5) Return combined response
     return {
         "risk_level": risk,
         "spread_distance_km": spread["spread_distance_km"],
         "spread_direction_deg": spread["spread_direction_deg"],
-        "predictionID": prediction_id
+        "predictionID": prediction_id,  # None for grid cells
     }
 
 # To run the server, use the command:

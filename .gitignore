@@ -39,3 +39,36 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Python virtual envs
+.venv/
+venv/
+**/.venv/
+**/venv/
+
+# Python cache
+__pycache__/
+*.pyc
+# secrets
+serviceAccountKey.json
+**/serviceAccountKey.json
+*.pem
+*.key
+*.p12
+*.pfx
+.env
+.env.*
+!.env.example
+
+# python
+model_server/.venv/
+**/.venv/
+__pycache__/
+*.pyc
+
+# node / next
+node_modules/
+.next/
+out/
+.vercel/
+

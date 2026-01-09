@@ -1,10 +1,11 @@
-from concurrent.futures import process
 import requests
 import logging
 from datetime import datetime
+import os
+from dotenv import load_dotenv
 
-OPENWEATHER_API_KEY = process.env.NEXT_PUBLIC_OPENWEATHER_API_KEY
-
+load_dotenv()
+API_KEY = os.getenv("NEXT_PUBLIC_OPENWEATHER_API_KEY", "")
 # Pick a representative point inside UM (central point)
 UM_WEATHER_POINT = {
     "lat": 3.120,
@@ -30,7 +31,7 @@ def get_um_hourly_weather():
         params={
             "lat": UM_WEATHER_POINT["lat"],
             "lon": UM_WEATHER_POINT["lon"],
-            "appid": OPENWEATHER_API_KEY,
+            "appid": API_KEY,
             "units": "metric",
         },
         timeout=10,
@@ -50,4 +51,3 @@ def get_um_hourly_weather():
     _cached_hour = current_hour
 
     return weather
-
