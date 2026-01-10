@@ -2,6 +2,8 @@ export interface Reply {
   name: string;
   text: string;
   timestamp: string;
+  avatarUrl?: string;
+  userId: string;
 }
 
 export interface Post {
@@ -16,4 +18,5 @@ export interface Post {
   views?: number;
   likes?: number;
   replies?: Reply[];
+  createdAt?: any;
 }

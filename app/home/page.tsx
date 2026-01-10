@@ -39,14 +39,14 @@ const { user, loading } = useAuth();
           <p className="text-gray-600 mb-10">Here’s what you can do today:</p>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Link href="/diagnosis/upload">
+            <Link href="/Dashboard">
               <div className="bg-white p-6 rounded-lg shadow hover:shadow-md hover:bg-green-50 transition text-center min-h-[220px] flex flex-col justify-between cursor-pointer">
                 <ImagePlus className="h-10 w-10 mx-auto text-green-600 mb-2" />
                 <h2 className="text-lg font-semibold text-gray-800">
                   Upload Plant for Health Check
                 </h2>
                 <p className="text-sm text-gray-500">
-                  Get instant feedback and health suggestions.
+                  Get instant feedback on your plant health.
                 </p>
               </div>
             </Link>
