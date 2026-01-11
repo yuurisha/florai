@@ -9,6 +9,7 @@ import {
   runTransaction,
   doc,
   serverTimestamp,
+  deleteDoc,
 } from "firebase/firestore";
 import { db } from "../lib/firebaseConfig";
 import { auth } from "../lib/firebaseConfig";
@@ -153,4 +154,12 @@ export async function rejectEvent(eventId: string) {
   await updateDoc(doc(db, "events", eventId), {
     status: "rejected",
   })
+}
+
+export async function deleteEvent(eventId: string) {
+  const user = auth.currentUser
+  if (!user) throw new Error("Not authenticated")
+
+  // OPTIONAL: check admin role here
+  await deleteDoc(doc(db, "events", eventId))
 }

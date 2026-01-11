@@ -21,27 +21,22 @@ declare module "leaflet" {
 }
 
 interface MapViewerProps {
-  setWeather: React.Dispatch<
-    React.SetStateAction<{
-      temperature: string;
-      humidity: string;
-      rainfall: string;
-    }>
-  >;
-  setSpreadDetails: React.Dispatch<
-    React.SetStateAction<{
-      riskLevel: string;
-      spreadDistance: string;
-    }>
-  >;
-  setLocation: React.Dispatch<
-    React.SetStateAction<{
-      latitude: string;
-      longitude: string;
-    }>
-  >;
-  setIsLoading: (value: boolean) => void;
-  setRetryFn: (fn: null | (() => void)) => void;
+  setWeather: React.Dispatch<React.SetStateAction<{
+    temperature: string;
+    humidity: string;
+    rainfall: string;
+  }>>;
+  setSpreadDetails: React.Dispatch<React.SetStateAction<{
+    riskLevel: string;
+    spreadDistance: string;
+  }>>;
+  setLocation: React.Dispatch<React.SetStateAction<{
+    latitude: string;
+    longitude: string;
+  }>>;
+  setIsLoading: React.Dispatch<React.SetStateAction<boolean>>;
+  setRetryFn: React.Dispatch<React.SetStateAction<null | (() => void)>>;
+  setError: React.Dispatch<React.SetStateAction<string | null>>;
 }
 
 const ClickHandler = ({ onMapClick }: { onMapClick: (e: any) => void }) => {
@@ -88,13 +83,14 @@ function toDMS(dec: number): string {
   return `${deg}° ${min}' ${sec}"`;
 }
 
-const MapViewer = ({
+export default function MapViewer({
   setWeather,
   setSpreadDetails,
   setLocation,
   setIsLoading,
   setRetryFn,
-}: MapViewerProps) => {
+  setError
+}: MapViewerProps) {
   const [heatPoints, setHeatPoints] = useState<[number, number, number][]>([]);
   const clickLocked = useRef(false);
 
@@ -247,5 +243,3 @@ const MapViewer = ({
     </MapContainer>
   );
 };
-
-export default MapViewer;

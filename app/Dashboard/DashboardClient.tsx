@@ -21,6 +21,7 @@ import {
   Menu,
 } from "lucide-react";
 import jsPDF from "jspdf";
+import toast from "react-hot-toast";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/card";
 import { Input } from "../../components/input";
@@ -65,9 +66,17 @@ export default function DashboardClient() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (!user) {
-        // User is not signed in, redirect to login
-        window.location.href = "/login";
+        try {
+          // User is not signed in, redirect to login
+          window.location.href = "/login";
+        } catch (error: any) {
+          console.error("Redirect to login failed:", error);
+          toast.error("Failed to redirect to login. Please refresh the page.");
+        }
       }
+    }, (error) => {
+      console.error("Auth state change error:", error);
+      toast.error("Authentication error. Please refresh the page.");
     });
     return () => unsubscribe();
   }, []);
@@ -91,6 +100,7 @@ export default function DashboardClient() {
 
   const [isLoading, setIsLoading] = useState(false);
   const [retryFn, setRetryFn] = useState<null | (() => void)>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
   const hasRealData =
@@ -113,72 +123,90 @@ export default function DashboardClient() {
 }, [location, weather, spreadDetails]);
 
 const exportToPDF = () => {
-  if (!lastResult) return;
+  if (!lastResult) {
+    toast.error("No prediction data available to export.");
+    return;
+  }
 
-  const doc = new jsPDF();
-  const title = "GreenTrack Prediction Report (UI Point)";
-  const y0 = 18;
+  try {
+    const doc = new jsPDF();
+    const title = "Prediction Report";
+    const y0 = 18;
 
-  doc.setFontSize(16);
-  doc.text(title, 14, y0);
+    doc.setFontSize(16);
+    doc.text(title, 14, y0);
 
-  doc.setFontSize(11);
-  const lines = [
-    `Created At: ${lastResult.createdAt}`,
-    `Latitude: ${lastResult.latitude}`,
-    `Longitude: ${lastResult.longitude}`,
-    `Temperature: ${lastResult.temperature}`,
-    `Humidity: ${lastResult.humidity}`,
-    `Rainfall: ${lastResult.rainfall}`,
-    `Risk Level: ${lastResult.riskLevel}`,
-    `Spread Distance: ${lastResult.spreadDistance}`,
-  ];
+    doc.setFontSize(11);
+    const lines = [
+      `Created At: ${lastResult.createdAt}`,
+      `Latitude: ${lastResult.latitude}`,
+      `Longitude: ${lastResult.longitude}`,
+      `Temperature: ${lastResult.temperature}`,
+      `Humidity: ${lastResult.humidity}`,
+      `Rainfall: ${lastResult.rainfall}`,
+      `Risk Level: ${lastResult.riskLevel}`,
+      `Spread Distance: ${lastResult.spreadDistance}`,
+    ];
 
-  let y = y0 + 12;
-  lines.forEach((line) => {
-    doc.text(line, 14, y);
-    y += 8;
-  });
+    let y = y0 + 12;
+    lines.forEach((line) => {
+      doc.text(line, 14, y);
+      y += 8;
+    });
 
-  doc.save(`greentrack-ui-prediction-${lastResult.createdAt.slice(0, 10)}.pdf`);
+    doc.save(`greentrack-ui-prediction-${lastResult.createdAt.slice(0, 10)}.pdf`);
+    toast.success("PDF exported successfully!");
+  } catch (error: any) {
+    console.error("PDF export failed:", error);
+    toast.error(error?.message || "Failed to export PDF. Please try again.");
+  }
 };
 
 
 const exportToCSV = () => {
-  if (!lastResult) return;
+  if (!lastResult) {
+    toast.error("No prediction data available to export.");
+    return;
+  }
 
-  const rows = [
-    ["Field", "Value"],
-    ["Created At", lastResult.createdAt],
-    ["Latitude", String(lastResult.latitude)],
-    ["Longitude", String(lastResult.longitude)],
-    ["Temperature", String(lastResult.temperature)],
-    ["Humidity", String(lastResult.humidity)],
-    ["Rainfall", String(lastResult.rainfall)],
-    ["Risk Level", String(lastResult.riskLevel)],
-    ["Spread Distance", String(lastResult.spreadDistance)],
-  ];
+  try {
+    const rows = [
+      ["Field", "Value"],
+      ["Created At", lastResult.createdAt],
+      ["Latitude", String(lastResult.latitude)],
+      ["Longitude", String(lastResult.longitude)],
+      ["Temperature", String(lastResult.temperature)],
+      ["Humidity", String(lastResult.humidity)],
+      ["Rainfall", String(lastResult.rainfall)],
+      ["Risk Level", String(lastResult.riskLevel)],
+      ["Spread Distance", String(lastResult.spreadDistance)],
+    ];
 
-  const escapeCSV = (v: string) => {
-    if (v.includes(",") || v.includes('"') || v.includes("\n")) {
-      return `"${v.replace(/"/g, '""')}"`;
-    }
-    return v;
-  };
+    const escapeCSV = (v: string) => {
+      if (v.includes(",") || v.includes('"') || v.includes("\n")) {
+        return `"${v.replace(/"/g, '""')}"`;
+      }
+      return v;
+    };
 
-  const csvContent = rows
-    .map((row) => row.map((cell) => escapeCSV(String(cell))).join(","))
-    .join("\n");
+    const csvContent = rows
+      .map((row) => row.map((cell) => escapeCSV(String(cell))).join(","))
+      .join("\n");
 
-  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-  const url = window.URL.createObjectURL(blob);
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = window.URL.createObjectURL(blob);
 
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `greentrack-ui-prediction-${lastResult.createdAt.slice(0, 10)}.csv`;
-  link.click();
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `FlorAIprediction-${lastResult.createdAt.slice(0, 10)}.csv`;
+    link.click();
 
-  window.URL.revokeObjectURL(url);
+    window.URL.revokeObjectURL(url);
+    toast.success("CSV exported successfully!");
+  } catch (error: any) {
+    console.error("CSV export failed:", error);
+    toast.error(error?.message || "Failed to export CSV. Please try again.");
+  }
 };
 
   return (
@@ -250,15 +278,20 @@ const exportToCSV = () => {
 )}
 
   {retryFn && !isLoading && (
-    <Card className="border-red-500">
+    <Card className="border-red-500 bg-red-50">
       <CardHeader>
-        <CardTitle>Prediction Failed</CardTitle>
-        <CardDescription>You may retry the last prediction request.</CardDescription>
+        <CardTitle className="text-red-700">Prediction Failed</CardTitle>
+        <CardDescription className="text-red-600">
+          {error || "An error occurred while processing your prediction."}
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <button
-          onClick={() => retryFn()}
-          className="bg-red-600 text-white px-4 py-2 rounded"
+          onClick={() => {
+            setError(null);
+            retryFn();
+          }}
+          className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition-colors"
         >
           Retry Prediction
         </button>
@@ -311,6 +344,7 @@ const exportToCSV = () => {
                   setLocation={setLocation}
                   setIsLoading={setIsLoading}
                   setRetryFn={setRetryFn}
+                  setError={setError}
                   />
                 </CardContent>
               </Card>

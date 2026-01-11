@@ -118,6 +118,16 @@ if (data.type === "ai_alert" && data.predictedRisk) {
 
       prediction, // typed
       report,
+      
+      // Include prediction fields directly on notification
+      latitude: data.latitude ?? prediction?.latitude,
+      longitude: data.longitude ?? prediction?.longitude,
+      temperature: data.temperature ?? prediction?.temperature,
+      rainfall: data.rainfall ?? prediction?.rainfall,
+      humidity: data.humidity ?? prediction?.humidity,
+      predictedSpread: data.predictedSpread ?? prediction?.predictedSpread,
+      predictedRisk: data.predictedRisk ?? prediction?.predictedRisk,
+      
       _id: ""
     });
   }

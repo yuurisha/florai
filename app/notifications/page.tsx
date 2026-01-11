@@ -3,9 +3,12 @@
 import TopNavbar from "@/components/TopNavBar";
 import { useNotifications } from "@/context/NotificationContext";
 import Link from "next/link";
+import toast from "react-hot-toast";
+import { useState } from "react";
 
 export default function NotificationLogPage() {
   const { notifications, markAsRead, markAllAsRead } = useNotifications();
+  const [loading, setLoading] = useState<string | null>(null);
 
   // Sort newest → oldest safely
   const sorted = [...notifications].sort((a, b) => {
@@ -13,6 +16,32 @@ export default function NotificationLogPage() {
     const db = b?.createdAt ? new Date(b.createdAt).getTime() : 0;
     return db - da;
   });
+
+  const handleMarkAsRead = async (notificationId: string) => {
+    setLoading(notificationId);
+    try {
+      await markAsRead(notificationId);
+      toast.success("Notification marked as read");
+    } catch (error: any) {
+      console.error("Error marking notification as read:", error);
+      toast.error(error?.message || "Failed to mark notification as read");
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const handleMarkAllAsRead = async () => {
+    setLoading("all");
+    try {
+      await markAllAsRead();
+      toast.success("All notifications marked as read");
+    } catch (error: any) {
+      console.error("Error marking all as read:", error);
+      toast.error(error?.message || "Failed to mark all notifications as read");
+    } finally {
+      setLoading(null);
+    }
+  };
 
   return (
     <>
@@ -34,10 +63,11 @@ export default function NotificationLogPage() {
             </Link>
 
             <button
-              onClick={markAllAsRead}
-              className="text-gray-500 hover:text-gray-700"
+              onClick={handleMarkAllAsRead}
+              disabled={loading === "all"}
+              className="text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Mark all as read
+              {loading === "all" ? "Processing..." : "Mark all as read"}
             </button>
           </div>
         </div>
@@ -76,25 +106,36 @@ export default function NotificationLogPage() {
 
                 const notificationKey = n.notificationID ?? n._id;
 
-                // Safe values
-                const risk = p?.predictedRisk
-                  ? p.predictedRisk.toString().toUpperCase()
+                // Get risk from notification directly or from nested prediction
+                const riskValue = n.predictedRisk || p?.predictedRisk;
+                const risk = riskValue ? riskValue.toString().toUpperCase() : "-";
+                
+                // Get spread from notification directly or from nested prediction
+                const spreadValue = n.predictedSpread ?? p?.predictedSpread;
+                const spread = typeof spreadValue === "number" 
+                  ? `${spreadValue.toFixed(2)} m²` 
                   : "-";
 
-                const spread =
-                  typeof p?.predictedSpread === "number"
-                    ? p.predictedSpread.toFixed(2)
-                    : "-";
-
-                const coords =
-                  typeof p?.latitude === "number" &&
-                  typeof p?.longitude === "number"
-                    ? `${p.latitude.toFixed(3)}, ${p.longitude.toFixed(3)}`
-                    : "-";
+                // Get coordinates
+                const lat = n.latitude ?? p?.latitude;
+                const lon = n.longitude ?? p?.longitude;
+                const coords = typeof lat === "number" && typeof lon === "number"
+                  ? `${lat.toFixed(3)}, ${lon.toFixed(3)}`
+                  : "-";
 
                 const time = n?.createdAt
                   ? new Date(n.createdAt).toLocaleString()
                   : "-";
+
+                // Risk badge styling
+                const getRiskStyle = () => {
+                  if (!riskValue) return "bg-gray-100 text-gray-600";
+                  const r = riskValue.toLowerCase();
+                  if (r === "high") return "bg-red-100 text-red-700 font-semibold";
+                  if (r === "medium") return "bg-yellow-100 text-yellow-700 font-medium";
+                  if (r === "low") return "bg-green-100 text-green-700";
+                  return "bg-gray-100 text-gray-600";
+                };
 
                 return (
                   <tr
@@ -112,13 +153,17 @@ export default function NotificationLogPage() {
                     </td>
 
                     {/* Risk */}
-                    <td className="px-4 py-2 text-xs">{risk}</td>
+                    <td className="px-4 py-2">
+                      <span className={`inline-block px-2 py-1 rounded text-xs ${getRiskStyle()}`}>
+                        {risk}
+                      </span>
+                    </td>
 
                     {/* Spread */}
-                    <td className="px-4 py-2 text-xs">{spread}</td>
+                    <td className="px-4 py-2 text-xs font-medium">{spread}</td>
 
                     {/* Coordinates */}
-                    <td className="px-4 py-2 text-xs">{coords}</td>
+                    <td className="px-4 py-2 text-xs font-mono text-gray-600">{coords}</td>
 
                     {/* Time */}
                     <td className="px-4 py-2 text-[11px] text-gray-500">
@@ -131,10 +176,11 @@ export default function NotificationLogPage() {
                         <span className="text-gray-400">Read</span>
                       ) : (
                         <button
-                          onClick={() => markAsRead(n.notificationID)}
-                          className="text-green-700 hover:underline"
+                          onClick={() => handleMarkAsRead(n.notificationID)}
+                          disabled={loading === n.notificationID}
+                          className="text-green-700 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          Mark read
+                          {loading === n.notificationID ? "..." : "Mark read"}
                         </button>
                       )}
                     </td>

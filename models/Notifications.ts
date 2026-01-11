@@ -19,7 +19,7 @@ export interface Notification {
   predictionID?: string;    // AI alerts (you must add this FK in DB)
   userID: string;           
   adminID?: string;
-   prediction?: PredictionSummary;  // for AI alerts
+  prediction?: PredictionSummary;  // for AI alerts
   report?: ReportSummary;          // for user reports
 
   // Derived from Prediction (if AI alert)

@@ -1,10 +1,17 @@
 "use client"
 
-import { Calendar, MapPin, Users, Clock, User } from "lucide-react"
+import { Calendar, MapPin, Users, Clock, User, Trash2 } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./dialog"
 import { Badge } from "./badge"
 import { Button } from "./button"
 import type { Event } from "../models/Event"
+import { useState, useEffect } from "react"
+import { auth, db } from "../lib/firebaseConfig"
+import { doc, getDoc } from "firebase/firestore"
+import { deleteEvent } from "../controller/eventController"
+import toast from "react-hot-toast"
+import { useRouter } from "next/navigation"
+import ConfirmDeleteModal from "./ConfirmDeleteModal"
 
 interface EventDetailsModalProps {
   event: Event | null
@@ -21,6 +28,58 @@ export function EventDetailsModal({
   onInterestChange,
   userInterestStatus,
 }: EventDetailsModalProps) {
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const router = useRouter()
+
+  // Check if current user is admin
+  useEffect(() => {
+    const checkAdmin = async () => {
+      const user = auth.currentUser
+      if (!user) {
+        setIsAdmin(false)
+        return
+      }
+
+      try {
+        const userDoc = await getDoc(doc(db, "users", user.uid))
+        if (userDoc.exists()) {
+          const userData = userDoc.data()
+          setIsAdmin(userData?.role === "admin")
+        }
+      } catch (error) {
+        console.error("Error checking admin status:", error)
+        setIsAdmin(false)
+      }
+    }
+
+    if (isOpen) {
+      checkAdmin()
+    }
+  }, [isOpen])
+
+  const handleDeleteEvent = async () => {
+    if (!event) return
+
+    setDeleting(true)
+    setShowDeleteConfirm(false)
+    
+    try {
+      await deleteEvent(event.id)
+      toast.success("Event deleted successfully")
+      onClose()
+      // Refresh the page to update the events list
+      router.refresh()
+      window.location.reload()
+    } catch (error: any) {
+      console.error("Error deleting event:", error)
+      toast.error(error?.message || "Failed to delete event")
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   if (!event) return null
 
   const getCategoryColor = (category: Event["category"]) => {
@@ -51,6 +110,7 @@ export function EventDetailsModal({
   }
 
   return (
+    <>
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
@@ -142,8 +202,33 @@ export function EventDetailsModal({
               👎 {userInterestStatus === "not-interested" ? "Not Interested" : "Mark as Not Interested"}
             </Button>
           </div>
+
+          {/* Admin Delete Button */}
+          {isAdmin && (
+            <div className="pt-4 border-t">
+              <Button
+                variant="destructive"
+                onClick={() => setShowDeleteConfirm(true)}
+                disabled={deleting}
+                className="w-full gap-2 bg-red-600 hover:bg-red-700"
+              >
+                <Trash2 className="h-4 w-4" />
+                {deleting ? "Deleting Event..." : "Delete Event (Admin)"}
+              </Button>
+            </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>
+
+    {/* Delete Confirmation Modal - Outside Dialog to avoid black background */}
+    {showDeleteConfirm && event && (
+      <ConfirmDeleteModal
+        message={`Are you sure you want to permanently delete this event: "${event.title}"?\n\nThis action cannot be undone and will remove the event for all users.`}
+        onConfirm={handleDeleteEvent}
+        onCancel={() => setShowDeleteConfirm(false)}
+      />
+    )}
+    </>
   )
 }
