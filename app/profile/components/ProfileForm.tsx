@@ -7,6 +7,7 @@ import toast from "react-hot-toast";
 import { auth, db, storage } from "../../../lib/firebaseConfig";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
+import { onAuthStateChanged } from "firebase/auth";
 
 import { Button } from "../../../components/button";
 import { Input } from "../../../components/input";
@@ -36,14 +37,13 @@ export default function ProfileForm() {
   const [uploadingPic, setUploadingPic] = useState(false);
 
   useEffect(() => {
-    const run = async () => {
-      try {
-        const user = auth.currentUser;
-        if (!user?.uid) {
-          setInitialLoading(false);
-          return;
-        }
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user?.uid) {
+        setInitialLoading(false);
+        return;
+      }
 
+      try {
         const snap = await getDoc(doc(db, "users", user.uid));
         if (snap.exists()) {
           const data = snap.data() as any;
@@ -58,9 +58,9 @@ export default function ProfileForm() {
       } finally {
         setInitialLoading(false);
       }
-    };
+    });
 
-    run();
+    return () => unsubscribe();
   }, []);
 
   const handlePickImage = () => fileInputRef.current?.click();
