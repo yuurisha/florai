@@ -105,7 +105,6 @@ export default function CredentialsSection() {
     setConfirmNewPassword("");
   };
 
-  // ✅ EMAIL: verify-first flow
   const handleUpdateEmail = async () => {
     try {
       setEmailLoading(true);
@@ -121,11 +120,9 @@ export default function CredentialsSection() {
       if (nextEmail === user.email) return toast("No changes to update.");
       if (!emailPassword.trim()) return toast.error("Enter your current password.");
 
-      // Re-authenticate
       const cred = EmailAuthProvider.credential(user.email, emailPassword.trim());
       await reauthenticateWithCredential(user, cred);
 
-      // Send verification link to NEW email (email changes after user clicks link)
       const actionCodeSettings = {
         url: `${window.location.origin}/profile`, // ✅ change to your page if needed
         handleCodeInApp: false,

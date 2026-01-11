@@ -81,7 +81,6 @@ export default function ProfileForm() {
       return;
     }
 
-    // Optional: limit size (2MB)
     const MAX_MB = 2;
     if (file.size > MAX_MB * 1024 * 1024) {
       toast.error(`Image too large. Max ${MAX_MB}MB.`);
@@ -114,10 +113,8 @@ export default function ProfileForm() {
       toast.success("Profile picture updated!");
     } catch (err: any) {
       toast.error(err?.message || "Failed to upload profile picture.");
-      // fallback: reload saved url from firestore would be ideal, but keep it simple
     } finally {
       setUploadingPic(false);
-      // allow re-selecting the same file again later
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };

@@ -8,6 +8,7 @@ import AdminTopNavbar from "../../../components/adminTopNavBar"
 import { Button } from "../../../components/button"
 import { Card, CardContent, CardHeader, CardTitle } from "../../../components/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../components/select"
+import ConfirmDeleteModal from "../../../components/ConfirmDeleteModal"
 
 import type { Event } from "../../../models/Event"
 import {
@@ -25,6 +26,8 @@ export default function AdminEventsPage() {
   const [error, setError] = useState<string | null>(null)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("pending")
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+  const [eventToDelete, setEventToDelete] = useState<string | null>(null)
 
   // ---- Load events ----
   const loadEvents = async () => {
@@ -111,21 +114,25 @@ export default function AdminEventsPage() {
     }
   }
 
-  const handleDelete = async (eventId: string) => {
-    if (!confirm("Are you sure you want to permanently delete this event? This action cannot be undone.")) {
-      return
-    }
+  const handleDelete = (eventId: string) => {
+    setEventToDelete(eventId)
+    setDeleteModalOpen(true)
+  }
 
-    setActionLoading(eventId)
+  const confirmDelete = async () => {
+    if (!eventToDelete) return
+
+    setActionLoading(eventToDelete)
+    setDeleteModalOpen(false)
     
     // Store previous state for rollback
     const previousEvents = [...events]
     
     // Optimistic removal
-    setEvents((prev) => prev.filter((e) => e.id !== eventId))
+    setEvents((prev) => prev.filter((e) => e.id !== eventToDelete))
 
     try {
-      await deleteEvent(eventId)
+      await deleteEvent(eventToDelete)
       toast.success("Event deleted permanently.")
     } catch (err: any) {
       console.error("Error deleting event:", err)
@@ -134,6 +141,7 @@ export default function AdminEventsPage() {
       toast.error(err?.message || "Failed to delete event.")
     } finally {
       setActionLoading(null)
+      setEventToDelete(null)
     }
   }
 
@@ -293,6 +301,18 @@ export default function AdminEventsPage() {
           </div>
         )}
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {deleteModalOpen && (
+        <ConfirmDeleteModal
+          message="Are you sure you want to permanently delete this event? This action cannot be undone."
+          onConfirm={confirmDelete}
+          onCancel={() => {
+            setDeleteModalOpen(false)
+            setEventToDelete(null)
+          }}
+        />
+      )}
     </div>
   )
 }

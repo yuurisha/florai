@@ -17,7 +17,7 @@ export default function AdminPage() {
       <main className="p-6"></main>
       <h1 className="text-2xl font-bold mb-4">Manage Post</h1>
       
-      {/* Add admin controls here */}
+      {/* This page is not in use or implemented */}
       </div>
     </div>
   );
