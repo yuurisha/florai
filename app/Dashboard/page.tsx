@@ -20,8 +20,6 @@ import {
   X,
   Menu,
 } from "lucide-react";
-import jsPDF from "jspdf";
-
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/card";
 import { Input } from "../../components/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/tabs";
@@ -31,6 +29,8 @@ import dynamic from "next/dynamic";
 import TopNavBar from "../../components/TopNavBar";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "../../lib/firebaseConfig";
+import { fetchGreenSpaces } from "@/controller/greenSpaceController";
+import { GreenSpace } from "@/models/greenSpace";
 
 export default function DashboardPage() {
   const [isMobile, setIsMobile] = useState(false);
@@ -93,6 +93,35 @@ const MapViewer = dynamic(() => import("../../components/MapViewer"), { ssr: fal
 
   const [isLoading, setIsLoading] = useState(false);
   const [retryFn, setRetryFn] = useState<null | (() => void)>(null);
+  const [greenSpaces, setGreenSpaces] = useState<GreenSpace[]>([]);
+  const [greenSpacesLoading, setGreenSpacesLoading] = useState(true);
+  const [greenSpacesError, setGreenSpacesError] = useState<string | null>(null);
+
+  const getHealthLabel = (zone: GreenSpace) => {
+    const total = zone.totalUploads ?? 0;
+    if (total === 0) return "No data";
+    if ((zone.healthIndex ?? 0) >= 0.8) return "Healthy";
+    if ((zone.healthIndex ?? 0) >= 0.6) return "Moderate";
+    return "Unhealthy";
+  };
+
+  const getHealthPercent = (zone: GreenSpace) => {
+    const total = zone.totalUploads ?? 0;
+    if (total === 0) return "--";
+    return `${Math.round((zone.healthIndex ?? 0) * 100)}%`;
+  };
+
+  const greenSpaceSummary = greenSpaces.reduce(
+    (acc, zone) => {
+      const label = getHealthLabel(zone);
+      if (label === "Healthy") acc.healthy += 1;
+      else if (label === "Moderate") acc.moderate += 1;
+      else if (label === "Unhealthy") acc.unhealthy += 1;
+      else acc.noData += 1;
+      return acc;
+    },
+    { healthy: 0, moderate: 0, unhealthy: 0, noData: 0 }
+  );
 
   useEffect(() => {
   const hasRealData =
@@ -113,6 +142,31 @@ const MapViewer = dynamic(() => import("../../components/MapViewer"), { ssr: fal
     createdAt: new Date().toISOString(),
   });
 }, [location, weather, spreadDetails]);
+
+  useEffect(() => {
+    let active = true;
+    setGreenSpacesLoading(true);
+    setGreenSpacesError(null);
+
+    fetchGreenSpaces()
+      .then((data) => {
+        if (!active) return;
+        setGreenSpaces(data);
+      })
+      .catch((err) => {
+        if (!active) return;
+        console.error("Failed to load green spaces:", err);
+        setGreenSpacesError("Failed to load green spaces.");
+      })
+      .finally(() => {
+        if (!active) return;
+        setGreenSpacesLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
 const exportToPDF = async () => {
   if (!lastResult) return;
@@ -242,6 +296,86 @@ const exportToCSV = () => {
               </Card>
             </div>
           ) : null}
+
+          <Card>
+            <CardHeader>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <CardTitle>Green spaces</CardTitle>
+                  <CardDescription>All active zones with health status and uploads.</CardDescription>
+                </div>
+                <div className="flex flex-wrap gap-2 text-xs text-gray-600">
+                  <span className="rounded-full bg-emerald-50 px-2 py-1 text-emerald-700">
+                    Healthy: {greenSpaceSummary.healthy}
+                  </span>
+                  <span className="rounded-full bg-amber-50 px-2 py-1 text-amber-700">
+                    Moderate: {greenSpaceSummary.moderate}
+                  </span>
+                  <span className="rounded-full bg-red-50 px-2 py-1 text-red-700">
+                    Unhealthy: {greenSpaceSummary.unhealthy}
+                  </span>
+                  <span className="rounded-full bg-slate-100 px-2 py-1 text-slate-600">
+                    No data: {greenSpaceSummary.noData}
+                  </span>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {greenSpacesLoading ? (
+                <div className="text-sm text-gray-500">Loading green spaces…</div>
+              ) : greenSpacesError ? (
+                <div className="text-sm text-red-600">{greenSpacesError}</div>
+              ) : greenSpaces.length === 0 ? (
+                <div className="text-sm text-gray-500">No green spaces found.</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-gray-50 text-xs uppercase text-gray-500">
+                      <tr>
+                        <th className="px-3 py-2">Name</th>
+                        <th className="px-3 py-2">Health level</th>
+                        <th className="px-3 py-2">Health %</th>
+                        <th className="px-3 py-2">Total leaves</th>
+                        <th className="px-3 py-2">Healthy leaves</th>
+                        <th className="px-3 py-2">Diseased leaves</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {greenSpaces.map((zone) => {
+                        const total = zone.totalUploads ?? 0;
+                        const healthy = zone.healthyUploads ?? 0;
+                        const diseased = Math.max(total - healthy, 0);
+                        const healthLabel = getHealthLabel(zone);
+                        const healthClass =
+                          healthLabel === "Healthy"
+                            ? "bg-emerald-50 text-emerald-700"
+                            : healthLabel === "Moderate"
+                            ? "bg-amber-50 text-amber-700"
+                            : healthLabel === "Unhealthy"
+                            ? "bg-red-50 text-red-700"
+                            : "bg-slate-100 text-slate-600";
+
+                        return (
+                          <tr key={zone.id}>
+                            <td className="px-3 py-3 font-medium text-gray-900">{zone.name}</td>
+                            <td className="px-3 py-3">
+                              <span className={`rounded-full px-2 py-1 text-xs ${healthClass}`}>
+                                {healthLabel}
+                              </span>
+                            </td>
+                            <td className="px-3 py-3">{getHealthPercent(zone)}</td>
+                            <td className="px-3 py-3">{total}</td>
+                            <td className="px-3 py-3">{healthy}</td>
+                            <td className="px-3 py-3">{diseased}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
 {isLoading && (
   <Card className="border-yellow-500">
