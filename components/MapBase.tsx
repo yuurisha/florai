@@ -208,6 +208,16 @@ const legend = (L as any).control({ position: "topright" });
           const points = e.layer
             .getLatLngs()[0]
             .map((p: any) => ({ lat: p.lat, lng: p.lng }));
+          try {
+            drawnItems.addLayer(e.layer);
+            await createGreenSpace(nextName(), points);
+            const updated = await fetchGreenSpaces();
+            setZones(updated);
+            toast.success("Green space created.");
+          } catch (err: any) {
+            console.error(err);
+            toast.error(err?.message ?? "Failed to create green space.");
+          }
         });
       }
 
