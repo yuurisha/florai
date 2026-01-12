@@ -209,7 +209,7 @@ const legend = (L as any).control({ position: "topright" });
       /* ===== ADMIN DRAW ===== */
       if (mode === "admin") {
         const drawControl = new (L as any).Control.Draw({
-          edit: { featureGroup: drawnItems },
+          edit: false,
           draw: {
             polygon: true,
             rectangle: false,
