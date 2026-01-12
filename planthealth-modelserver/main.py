@@ -3,9 +3,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from ultralytics import YOLO
 from PIL import Image
 import io
+import os
 
 # Load YOLOv8 model
-model = YOLO("best.pt")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+model = YOLO(os.path.join(BASE_DIR, "best.pt"))
+@app.get("/")
+def root():
+    return {"message": "FLORAI PlantHealth ModelServer running"}
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
 
 app = FastAPI()
 
