@@ -26,9 +26,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../..
 import { Input } from "../../components/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/tabs";
 
-import MapViewer from "../../components/MapViewer";
+import dynamic from "next/dynamic";
+
 import TopNavBar from "../../components/TopNavBar";
-import router from "next/router";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "../../lib/firebaseConfig";
 
@@ -36,6 +36,7 @@ export default function DashboardPage() {
   const [isMobile, setIsMobile] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"map" | "weather">("map");
+const MapViewer = dynamic(() => import("../../components/MapViewer"), { ssr: false });
 
   const [weather, setWeather] = useState({
     temperature: "--",
@@ -113,8 +114,11 @@ export default function DashboardPage() {
   });
 }, [location, weather, spreadDetails]);
 
-const exportToPDF = () => {
+const exportToPDF = async () => {
   if (!lastResult) return;
+
+  // ✅ load jsPDF only in browser (avoids "window is not defined" during Vercel build)
+  const { default: jsPDF } = await import("jspdf");
 
   const doc = new jsPDF();
   const title = "GreenTrack Prediction Report (UI Point)";
@@ -143,6 +147,7 @@ const exportToPDF = () => {
 
   doc.save(`greentrack-ui-prediction-${lastResult.createdAt.slice(0, 10)}.pdf`);
 };
+
 
 
 const exportToCSV = () => {
