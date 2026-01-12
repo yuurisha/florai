@@ -1,6 +1,6 @@
 import { db } from "../lib/firebaseConfig";
 import { doc, getDoc, collection, addDoc,updateDoc,deleteDoc, getDocs, Timestamp, arrayUnion,increment } from "firebase/firestore";
-import { Post } from "../models/Post";
+import { Post, Reply } from "../models/Post";
 import { auth } from "../lib/firebaseConfig";
 
 const postsRef = collection(db, "posts");
@@ -89,7 +89,7 @@ export const editPost = async (postId: string, newContent: string) => {
 
 
 
-export async function addReplyToPost(id: string, reply: { name: string; text: string; timestamp: string }) {
+export async function addReplyToPost(id: string, reply: Reply) {
   const ref = doc(db, "posts", id);
   await updateDoc(ref, {
     replies: arrayUnion(reply)

@@ -210,6 +210,7 @@ import TopNavBar from "../../components/TopNavBar";
 import Sidebar from "./components/Sidebar";
 import ProfileForm from "./components/ProfileForm";
 import CredentialsForm from "./components/CredentialsForm";
+import BadgeSelector from "./components/BadgeSelector";
 import ProtectedRoute from "../../components/ProtectedRoute";
 
 console.log("ProtectedRoute:", ProtectedRoute);
@@ -220,6 +221,12 @@ console.log("CredentialsForm import:", CredentialsForm);
 
 export default function ProfilePage() {
   const [activeTab, setActiveTab] = useState("profile");
+  const title =
+    activeTab === "profile"
+      ? "Personal Information"
+      : activeTab === "credentials"
+        ? "Security Settings"
+        : "Badges";
 
   return (   
       <div className="min-h-screen bg-gray-100">
@@ -231,15 +238,15 @@ export default function ProfilePage() {
         <main className="flex-1 p-8">
           <div className="max-w-3xl mx-auto bg-white p-6 rounded-lg shadow">
             <h1 className="text-2xl font-bold text-green-700 mb-6">
-              {activeTab === "profile" ? "Personal Information" : "Security Settings"}
+              {title}
             </h1>
 
             {activeTab === "profile" && <ProfileForm />}
             {activeTab === "credentials" && <CredentialsForm />}
+            {activeTab === "badges" && <BadgeSelector />}
           </div>
         </main>
       </div>
     </div>
   );
 }
-

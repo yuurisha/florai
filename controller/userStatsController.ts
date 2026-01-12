@@ -1,15 +1,13 @@
 // src/controller/userStatsController.ts
 import { doc, getDoc, runTransaction, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebaseConfig";
+import type { BadgeKey } from "@/lib/badges";
 
 export type UserStats = {
   currentStreak: number;
   longestStreak: number;
   lastActionDate: string | null;
-  badges: {
-    streak7?: boolean;
-    streak30?: boolean;
-  };
+  badges: Partial<Record<BadgeKey, boolean>>;
 };
 
 function isoToday() {
@@ -56,7 +54,7 @@ export async function updateDailyStreak(uid: string) {
     let currentStreak = 0;
     let longestStreak = 0;
     let lastActionDate: string | null = null;
-    let badges: Record<string, boolean> = {};
+    let badges: Partial<Record<BadgeKey, boolean>> = {};
 
     if (snap.exists()) {
       const data = snap.data();
@@ -73,8 +71,10 @@ export async function updateDailyStreak(uid: string) {
 
     longestStreak = Math.max(longestStreak, currentStreak);
 
+    if (currentStreak >= 3) badges.streak3 = true;
     if (currentStreak >= 7) badges.streak7 = true;
     if (currentStreak >= 30) badges.streak30 = true;
+    if (currentStreak >= 365) badges.streak365 = true;
 
     tx.set(
       ref,

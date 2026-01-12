@@ -1,5 +1,5 @@
 "use client";
-import { Settings, User, KeyRound, LogOut } from "lucide-react";
+import { Settings, User, KeyRound, LogOut, Medal } from "lucide-react";
 import { Button } from "../../../components/button";
 import { signOut } from "firebase/auth";
 import { auth } from "../../../lib/firebaseConfig";
@@ -48,6 +48,16 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
               ${activeTab === "credentials" ? "bg-green-50 text-green-700 font-semibold" : "hover:bg-gray-100 hover:text-green-700"}`}
           >
             <KeyRound className="w-4 h-4" /> Edit Credentials
+          </button>
+        </li>
+
+        <li>
+          <button
+            onClick={() => setActiveTab("badges")}
+            className={`flex items-center gap-2 w-full px-3 py-2 rounded transition 
+              ${activeTab === "badges" ? "bg-green-50 text-green-700 font-semibold" : "hover:bg-gray-100 hover:text-green-700"}`}
+          >
+            <Medal className="w-4 h-4" /> Badges
           </button>
         </li>
 

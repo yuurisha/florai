@@ -17,6 +17,7 @@ const links = [
   { href: "/notifications", label: "Notification Centre" },
   { href: "/survey", label: "Survey" },
   { href: "/diary", label: "Diary" },
+  { href: "/gamification", label: "Gamification" },
 ];
 
 export default function TopNavbar() {

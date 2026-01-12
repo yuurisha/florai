@@ -12,7 +12,7 @@ import {
   incrementLikeCount,
   deletePost,
 } from "../../../../controller/postController";
-import { auth } from "../../../../lib/firebaseConfig";
+import { auth, db } from "../../../../lib/firebaseConfig";
 import TopNavBar from "../../../../components/TopNavBar";
 import ConfirmDeleteModal from "../../../../components/ConfirmDeleteModal"; 
 import EditPostModal from "../../../../components/EditPostModal";
@@ -24,6 +24,9 @@ console.log("Edit Modal component:", EditPostModal);
 import { Post, Reply } from "../../../../models/Post";
 import { onAuthStateChanged } from "firebase/auth";
 import ReportModal from "@/components/reportModal";
+import { doc, getDoc } from "firebase/firestore";
+import { badgeImageForKey, badgeLabelForKey, parseBadgeKey } from "@/lib/badges";
+import type { BadgeKey } from "@/lib/badges";
 
 
 
@@ -39,6 +42,8 @@ export default function ReadDiscussionPage() {
   const [showEdit, setShowEdit] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [reportTarget, setReportTarget] = useState<{ type: "forum" | "user"; id: string } | null>(null);
+  const [authorBadgeKey, setAuthorBadgeKey] = useState<BadgeKey | null>(null);
+  const [currentUserBadgeKey, setCurrentUserBadgeKey] = useState<BadgeKey | null>(null);
 
     //handle user session auth explicitly
     
@@ -65,17 +70,45 @@ export default function ReadDiscussionPage() {
     }
   }, [id]);
 
+  useEffect(() => {
+    const loadBadges = async () => {
+      if (!post?.userId) return;
+
+      const [authorSnap, currentSnap] = await Promise.all([
+        getDoc(doc(db, "users", post.userId)),
+        auth.currentUser?.uid ? getDoc(doc(db, "users", auth.currentUser.uid)) : Promise.resolve(null),
+      ]);
+
+      const authorBadge = authorSnap.exists()
+        ? parseBadgeKey(authorSnap.data()?.selectedBadge)
+        : null;
+      setAuthorBadgeKey(authorBadge);
+
+      if (currentSnap?.exists()) {
+        setCurrentUserBadgeKey(parseBadgeKey(currentSnap.data()?.selectedBadge));
+      }
+    };
+
+    loadBadges();
+  }, [post?.userId]);
+
   const handleReply = async () => {
-    if (reply.trim() && post?.id) {
-      const newReply: Reply = {
-        name: "You",
-        text: reply,
-        timestamp: new Date().toISOString(),
-      };
-      await addReplyToPost(post.id, newReply);
-      setReplies((prev) => [...prev, newReply]);
-      setReply("");
-    }
+    if (!reply.trim() || !post?.id) return;
+
+    const user = auth.currentUser;
+    if (!user) return;
+
+    const newReply: Reply = {
+      name: user.displayName || "You",
+      text: reply,
+      timestamp: new Date().toISOString(),
+      userId: user.uid,
+      badgeKey: currentUserBadgeKey ?? undefined,
+    };
+
+    await addReplyToPost(post.id, newReply);
+    setReplies((prev) => [...prev, newReply]);
+    setReply("");
   };
 
   const handleLike = async () => {
@@ -120,6 +153,8 @@ const handleEditSave = async (updatedContent: string) => {
   }
 
   const isPostOwner = auth.currentUser?.uid === post.userId;
+  const authorBadgeLabel = badgeLabelForKey(authorBadgeKey);
+  const authorBadgeImage = badgeImageForKey(authorBadgeKey);
 
   return (
     <>
@@ -148,6 +183,19 @@ const handleEditSave = async (updatedContent: string) => {
                 className="rounded-full"
               />
               <span>{post.author}</span>
+              {authorBadgeImage ? (
+                <Image
+                  src={authorBadgeImage}
+                  alt={authorBadgeLabel ?? "Badge"}
+                  width={28}
+                  height={28}
+                  className="rounded-full"
+                />
+              ) : authorBadgeLabel ? (
+                <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">
+                  {authorBadgeLabel}
+                </span>
+              ) : null}
               <span className="text-gray-400">•</span>
               <span>
                 <CalendarDays className="inline h-4 w-4 mr-1" />
@@ -208,24 +256,43 @@ const handleEditSave = async (updatedContent: string) => {
               Replies ({replies.length})
             </h2>
             <div className="space-y-4 mb-4">
-              {replies.map((reply, i) => (
-                <div
-                  key={i}
-                  className="border-b border-gray-200 pb-4 mb-4 last:border-0 last:mb-0 last:pb-0"
-                >
-                  <div className="flex items-center gap-3 mb-2">
-                    <Image
-                      src={`/avatar${(i % 4) + 1}.png`}
-                      alt="avatar"
-                      width={32}
-                      height={32}
-                      className="rounded-full"
-                    />
-                    <div className="text-sm font-medium">{reply.name}</div>
+              {replies.map((reply, i) => {
+                const replyBadgeLabel = badgeLabelForKey(reply.badgeKey);
+                const replyBadgeImage = badgeImageForKey(reply.badgeKey);
+                return (
+                  <div
+                    key={i}
+                    className="border-b border-gray-200 pb-4 mb-4 last:border-0 last:mb-0 last:pb-0"
+                  >
+                    <div className="flex items-center gap-3 mb-2">
+                      <Image
+                        src={`/avatar${(i % 4) + 1}.png`}
+                        alt="avatar"
+                        width={32}
+                        height={32}
+                        className="rounded-full"
+                      />
+                      <div className="flex items-center gap-2 text-sm font-medium">
+                        <span>{reply.name}</span>
+                        {replyBadgeImage ? (
+                          <Image
+                            src={replyBadgeImage}
+                            alt={replyBadgeLabel ?? "Badge"}
+                            width={24}
+                            height={24}
+                            className="rounded-full"
+                          />
+                        ) : replyBadgeLabel ? (
+                          <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+                            {replyBadgeLabel}
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                    <p className="text-gray-700 text-sm">{reply.text}</p>
                   </div>
-                  <p className="text-gray-700 text-sm">{reply.text}</p>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             <div className="flex flex-col gap-2">

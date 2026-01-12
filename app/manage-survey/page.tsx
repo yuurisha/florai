@@ -7,6 +7,8 @@ import { collection, getDocs, deleteDoc, updateDoc, doc, Timestamp, getCountFrom
 import { db } from "@/lib/firebaseConfig";
 import AdminTopNavBar from "@/components/adminTopNavBar";
 import Link from "next/link"; // ⭐ Make sure Link is imported for the Favorite List
+import { createNotificationDoc } from "@/controller/notificationController";
+import toast from "react-hot-toast";
 
 // Define the possible views
 type SurveyView = "list" | "form";
@@ -85,30 +87,82 @@ export default function ManageSurveyPage() {
 
 
   const handleTogglePublish = async (id: string, currentStatus: boolean) => {
-    const docRef = doc(db, "surveys", id);
-    await updateDoc(docRef, {
-      isPublished: !currentStatus,
-      isVisible: !currentStatus,
-    });
-    loadSurveys();
+    if (!currentStatus) {
+      const survey = surveys.find((s) => s.id === id);
+      const questionCount = survey?.questions?.length ?? 0;
+      if (questionCount === 0) {
+        toast.error("Add at least 1 question before publishing.");
+        return;
+      }
+    }
+
+    try {
+      const nextStatus = !currentStatus;
+      const docRef = doc(db, "surveys", id);
+      await updateDoc(docRef, {
+        isPublished: nextStatus,
+        isVisible: nextStatus,
+      });
+
+      if (nextStatus) {
+        try {
+          const survey = surveys.find((s) => s.id === id);
+          const surveyTitle = survey?.title ?? "New survey";
+          const usersSnap = await getDocs(collection(db, "users"));
+          const userIds = usersSnap.docs.map((d) => d.id);
+
+          await Promise.all(
+            userIds.map((userID) =>
+              createNotificationDoc({
+                type: "survey",
+                description: `New survey available: ${surveyTitle}`,
+                userID,
+              })
+            )
+          );
+        } catch (notifyError) {
+          console.error("Failed to create survey notifications:", notifyError);
+        }
+      }
+
+      await loadSurveys();
+      toast.success(nextStatus ? "Survey published successfully." : "Survey unpublished.");
+    } catch (err) {
+      console.error("Failed to update survey publish status:", err);
+      toast.error("Failed to update publish status. Please try again.");
+    }
   };
   
   const handleToggleFavorite = async (id: string, currentStatus: boolean) => {
-    const docRef = doc(db, "surveys", id);
-    await updateDoc(docRef, {
-     isFavorite: !currentStatus,
-    });
-    setSurveys(prev => prev.map(s => s.id === id ? {...s, isFavorite: !currentStatus} : s));
-    
-    if (!currentStatus) {
-        const count = await getResponsesCount(id);
-        setResponseCounts(prev => ({ ...prev, [id]: count }));
+    try {
+      const nextStatus = !currentStatus;
+      const docRef = doc(db, "surveys", id);
+      await updateDoc(docRef, {
+        isFavorite: nextStatus,
+      });
+      setSurveys(prev => prev.map(s => s.id === id ? {...s, isFavorite: nextStatus} : s));
+      
+      if (nextStatus) {
+          const count = await getResponsesCount(id);
+          setResponseCounts(prev => ({ ...prev, [id]: count }));
+      }
+
+      toast.success(nextStatus ? "Survey favorited." : "Survey unfavorited.");
+    } catch (err) {
+      console.error("Failed to update favorite status:", err);
+      toast.error("Failed to update favorite. Please try again.");
     }
   };
 
   const handleDelete = async (id: string) => {
-    await deleteDoc(doc(db, "surveys", id));
-    loadSurveys();
+    try {
+      await deleteDoc(doc(db, "surveys", id));
+      await loadSurveys();
+      toast.success("Survey deleted.");
+    } catch (err) {
+      console.error("Failed to delete survey:", err);
+      toast.error("Failed to delete survey. Please try again.");
+    }
   };
 
   const handleEdit = (survey: Survey) => {

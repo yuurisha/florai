@@ -35,6 +35,7 @@ import { auth } from "../../lib/firebaseConfig";
 export default function DashboardPage() {
   const [isMobile, setIsMobile] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<"map" | "weather">("map");
 
   const [weather, setWeather] = useState({
     temperature: "--",
@@ -189,51 +190,53 @@ const exportToCSV = () => {
 
       <div className="flex-1 overflow-auto p-6 pt-24">
         <div className="grid gap-6">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {activeTab === "map" ? (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <Card>
-              <CardHeader>
-                <CardTitle>Latitude</CardTitle>
-              </CardHeader>
-              <CardContent>{location.latitude}</CardContent>
-            </Card>
+                <CardHeader>
+                  <CardTitle>Latitude</CardTitle>
+                </CardHeader>
+                <CardContent>{location.latitude}</CardContent>
+              </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Longitude</CardTitle>
-              </CardHeader>
-              <CardContent>{location.longitude}</CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle>Temperature</CardTitle>
-              </CardHeader>
-              <CardContent>{weather.temperature}</CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle>Humidity</CardTitle>
-              </CardHeader>
-              <CardContent>{weather.humidity}</CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle>Rainfall</CardTitle>
-              </CardHeader>
-              <CardContent>{weather.rainfall}</CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle>Predicted Risk of Occurence Level</CardTitle>
-              </CardHeader>
-              <CardContent>{spreadDetails.riskLevel}</CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle>Predicted Spread Distance</CardTitle>
-              </CardHeader>
-              <CardContent>{spreadDetails.spreadDistance}</CardContent>
-            </Card>
-          </div>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Longitude</CardTitle>
+                </CardHeader>
+                <CardContent>{location.longitude}</CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Temperature</CardTitle>
+                </CardHeader>
+                <CardContent>{weather.temperature}</CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Humidity</CardTitle>
+                </CardHeader>
+                <CardContent>{weather.humidity}</CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Rainfall</CardTitle>
+                </CardHeader>
+                <CardContent>{weather.rainfall}</CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Predicted Risk of Occurence Level</CardTitle>
+                </CardHeader>
+                <CardContent>{spreadDetails.riskLevel}</CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Predicted Spread Distance</CardTitle>
+                </CardHeader>
+                <CardContent>{spreadDetails.spreadDistance}</CardContent>
+              </Card>
+            </div>
+          ) : null}
 
 {isLoading && (
   <Card className="border-yellow-500">
@@ -266,7 +269,11 @@ const exportToCSV = () => {
     </Card>
   )}
 
-          <Tabs defaultValue="map">
+          <Tabs
+            defaultValue="map"
+            value={activeTab}
+            onValueChange={(value) => setActiveTab(value as "map" | "weather")}
+          >
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="map">Invasive Plant Risk Prediction</TabsTrigger>
               <TabsTrigger value="weather">Upload Plant Image</TabsTrigger>

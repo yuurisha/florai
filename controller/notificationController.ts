@@ -40,10 +40,10 @@ export async function fetchUserNotifications(userID: string): Promise<Notificati
       channelInApp: true,
     };
 
-// If user disabled all in-app notifications → return empty
-if (!prefs.enableAiAlerts || !prefs.channelInApp) {
-  return [];
-}
+  // If user disabled all in-app notifications → return empty
+  if (!prefs.channelInApp) {
+    return [];
+  }
 
   const notifRef = collection(db, NOTIF_COLLECTION);
 
@@ -88,6 +88,10 @@ if (!prefs.enableAiAlerts || !prefs.channelInApp) {
       continue;
     }
 
+    if (data.type === "ai_alert" && prefs.enableAiAlerts === false) {
+      continue;
+    }
+
     // severity filter 
 if (data.type === "ai_alert" && data.predictedRisk) {
   const notifSeverity = SEVERITY_RANK[data.predictedRisk] ?? 0;
@@ -129,7 +133,7 @@ if (data.type === "ai_alert" && data.predictedRisk) {
  * CREATE NOTIFICATION
  * ------------------------------ */
 export async function createNotificationDoc(payload: {
-  type: "ai_alert" | "user_report";
+  type: "ai_alert" | "user_report" | "survey";
   description: string;
   userID: string;
   adminID?: string;

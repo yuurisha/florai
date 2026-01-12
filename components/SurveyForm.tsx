@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import toast from "react-hot-toast";
 import { auth } from "@/lib/firebaseConfig";
 import { collection, addDoc, doc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebaseConfig";
@@ -33,6 +34,8 @@ export default function SurveyForm({ onSurveySaved, survey, onCancelEdit }: Surv
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [questions, setQuestions] = useState<Question[]>([]);
+  const [errors, setErrors] = useState<{ title?: string; description?: string; questions?: string }>({});
+  const [banner, setBanner] = useState<string | null>(null);
 
   useEffect(() => {
     if (survey) {
@@ -98,6 +101,15 @@ export default function SurveyForm({ onSurveySaved, survey, onCancelEdit }: Surv
 
   // Filter out any questions that are empty (optional cleanup)
   const validQuestions = questions.filter(q => q.text.trim() !== '');
+  const nextErrors: { title?: string; description?: string; questions?: string } = {};
+  if (!title.trim()) nextErrors.title = "Title is required.";
+  if (!description.trim()) nextErrors.description = "Description is required.";
+  if (validQuestions.length === 0) nextErrors.questions = "Add at least 1 question.";
+  if (Object.keys(nextErrors).length > 0) {
+    setErrors(nextErrors);
+    setBanner("Please complete all required fields before saving.");
+    return;
+  }
 
   const newSurvey = {
     title,
@@ -112,7 +124,7 @@ export default function SurveyForm({ onSurveySaved, survey, onCancelEdit }: Surv
       // Update existing survey
       const docRef = doc(db, "surveys", survey.id);
       await updateDoc(docRef, newSurvey);
-      alert("✅ Survey updated!");
+      toast.success("Survey updated!");
     } else {
       // Create new survey with createdAt and createdBy
       const currentUser = auth.currentUser;
@@ -124,14 +136,17 @@ export default function SurveyForm({ onSurveySaved, survey, onCancelEdit }: Surv
         isFavorite: false,
         createdBy: currentUser.uid,
       });
-      alert("✅ Survey created!");
+
+      toast.success("Survey created!");
     }
 
     resetForm();
+    setErrors({});
+    setBanner(null);
     if (onSurveySaved) onSurveySaved();
   } catch (error) {
     console.error("Error saving survey:", error);
-    alert("❌ Failed to save survey.");
+    toast.error("Failed to save survey.");
   }
 };
 
@@ -141,12 +156,24 @@ export default function SurveyForm({ onSurveySaved, survey, onCancelEdit }: Surv
     className="space-y-5 bg-white p-6 rounded-2xl shadow-sm border border-gray-100"
     onSubmit={handleSubmit}
   >
+    {banner ? (
+      <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+        {banner}
+      </div>
+    ) : null}
+
     <div>
       <label className="block mb-1 font-medium text-gray-800">Survey Title</label>
       <input
         className="w-full border border-gray-200 px-4 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-200"
         value={title}
-        onChange={(e) => setTitle(e.target.value)}
+        onChange={(e) => {
+          setTitle(e.target.value);
+          if (errors.title) {
+            setErrors((prev) => ({ ...prev, title: undefined }));
+          }
+          if (banner) setBanner(null);
+        }}
         required
       />
     </div>
@@ -156,7 +183,13 @@ export default function SurveyForm({ onSurveySaved, survey, onCancelEdit }: Surv
       <textarea
         className="w-full border border-gray-200 px-4 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-200"
         value={description}
-        onChange={(e) => setDescription(e.target.value)}
+        onChange={(e) => {
+          setDescription(e.target.value);
+          if (errors.description) {
+            setErrors((prev) => ({ ...prev, description: undefined }));
+          }
+          if (banner) setBanner(null);
+        }}
         required
         rows={4}
       />

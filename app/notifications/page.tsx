@@ -103,7 +103,11 @@ export default function NotificationLogPage() {
                   >
                     {/* Type */}
                     <td className="px-4 py-2 text-xs">
-                      {n.type === "ai_alert" ? "AI Alert" : "User Report"}
+                      {n.type === "ai_alert"
+                        ? "AI Alert"
+                        : n.type === "survey"
+                          ? "New Survey"
+                          : "User Report"}
                     </td>
 
                     {/* Description */}

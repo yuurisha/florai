@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useNotifications } from "@/context/NotificationContext";
-import { AlertTriangle, Flag, CheckCircle2 } from "lucide-react";
+import { AlertTriangle, Flag, CheckCircle2, ClipboardList } from "lucide-react";
 import { Notification } from "@/models/Notifications";
 
 // ---------------------------------------------------------
@@ -11,6 +11,10 @@ import { Notification } from "@/models/Notifications";
 function severityIcon(n: Notification) {
   if (n.type === "user_report") {
     return <Flag className="w-4 h-4 text-orange-500" />;
+  }
+
+  if (n.type === "survey") {
+    return <ClipboardList className="w-4 h-4 text-blue-500" />;
   }
 
   const risk = n.prediction?.predictedRisk?.toLowerCase();
@@ -91,7 +95,11 @@ export default function NotificationDrawer({ onClose }: { onClose: () => void })
                 <div className="flex-1">
                   {/* Title */}
                   <div className="text-xs font-semibold text-gray-800">
-                    {n.type === "ai_alert" ? "AI Risk Alert" : "User Report Alert"}
+                    {n.type === "ai_alert"
+                      ? "AI Risk Alert"
+                      : n.type === "survey"
+                        ? "New Survey"
+                        : "User Report Alert"}
                   </div>
 
                   {/* Description */}
