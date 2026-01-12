@@ -18,6 +18,7 @@ import {
   query,
   getCountFromServer,
   where,
+  Timestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebaseConfig";
 
@@ -45,6 +46,7 @@ const ENTITY_TYPES = [
   { label: "Tip", value: "learningTip" },
   { label: "Resource", value: "learningResource" },
   { label: "User", value: "user" },
+  { label: "Map", value: "map" },
 ];
 
 export default function AdminPage() {
@@ -65,6 +67,7 @@ export default function AdminPage() {
     userCount: 0,
     pendingEventCount: 0,
     surveyCount: 0,
+    todayUploadCount: 0,
   });
   const [loadingStats, setLoadingStats] = useState(true);
 
@@ -139,19 +142,28 @@ export default function AdminPage() {
         const usersCol = collection(db, "users");
         const eventsCol = collection(db, "events");
         const surveysCol = collection(db, "surveys");
+        const uploadsCol = collection(db, "uploads");
 
         const pendingEventsQ = query(eventsCol, where("status", "==", "pending"));
+        const startOfToday = new Date();
+        startOfToday.setHours(0, 0, 0, 0);
+        const todayUploadsQ = query(
+          uploadsCol,
+          where("createdAt", ">=", Timestamp.fromDate(startOfToday))
+        );
 
-        const [userAgg, pendingAgg, surveyAgg] = await Promise.all([
+        const [userAgg, pendingAgg, surveyAgg, todayUploadsAgg] = await Promise.all([
           getCountFromServer(query(usersCol)),
           getCountFromServer(pendingEventsQ),
           getCountFromServer(query(surveysCol)),
+          getCountFromServer(todayUploadsQ),
         ]);
 
         setStats({
           userCount: userAgg.data().count,
           pendingEventCount: pendingAgg.data().count,
           surveyCount: surveyAgg.data().count,
+          todayUploadCount: todayUploadsAgg.data().count,
         });
       } catch (e) {
         toast.error("Failed to load overview stats");
@@ -238,7 +250,7 @@ export default function AdminPage() {
               </span>
             </div>
 
-            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <div className="rounded-lg border bg-gray-50 p-4">
                 <div className="text-sm font-semibold text-gray-700">
                   Current Users
@@ -272,6 +284,18 @@ export default function AdminPage() {
                 </div>
                 <div className="mt-1 text-xs text-gray-500">
                   Total survey submissions
+                </div>
+              </div>
+
+              <div className="rounded-lg border bg-gray-50 p-4">
+                <div className="text-sm font-semibold text-gray-700">
+                  Today Upload Photos
+                </div>
+                <div className="mt-2 text-3xl font-bold text-gray-900">
+                  {loadingStats ? "—" : stats.todayUploadCount}
+                </div>
+                <div className="mt-1 text-xs text-gray-500">
+                  Uploaded plant photos today
                 </div>
               </div>
             </div>
@@ -416,6 +440,8 @@ function labelForEntity(entityType?: string) {
       return "Resource";
     case "user":
       return "User";
+    case "map":
+      return "Map";
     default:
       return entityType ?? "-";
   }

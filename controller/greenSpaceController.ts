@@ -10,11 +10,23 @@ import {
   increment,
   runTransaction,
   serverTimestamp,
+  getDoc,
 } from "firebase/firestore";
 import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { GreenSpace, LatLngPoint } from "@/models/greenSpace";
 
 const greenSpacesRef = collection(db, "greenSpaces");
+const activityLogsRef = collection(db, "activityLogs");
+
+function actorMeta() {
+  const user = auth.currentUser;
+  if (!user) throw new Error("Not authenticated");
+  return {
+    actorUid: user.uid,
+    actorEmail: user.email ?? null,
+    actorName: user.displayName ?? null,
+  };
+}
 
 /* ================= CREATE ================= */
 export const createGreenSpace = async (
@@ -24,7 +36,7 @@ export const createGreenSpace = async (
   const user = auth.currentUser;
   if (!user) throw new Error("Not authenticated");
 
-  await addDoc(greenSpacesRef, {
+  const docRef = await addDoc(greenSpacesRef, {
     name,
     polygon,
     isActive: true,
@@ -34,6 +46,17 @@ export const createGreenSpace = async (
     healthyUploads: 0,
     healthIndex: 0,
     photoUrl: null,
+  });
+
+  await addDoc(activityLogsRef, {
+    action: "create",
+    entityType: "map",
+    entityCollection: "greenSpaces",
+    entityId: docRef.id,
+    entityTitle: name,
+    ...actorMeta(),
+    createdAt: serverTimestamp(),
+    createdAtMs: Date.now(),
   });
 };
 
@@ -98,8 +121,21 @@ export const deleteGreenSpace = async (greenSpaceId: string) => {
   if (!user) throw new Error("Not authenticated");
 
   const ref = doc(db, "greenSpaces", greenSpaceId);
+  const snap = await getDoc(ref);
   await updateDoc(ref, {
     isActive: false,
+  });
+
+  const name = snap.exists() ? (snap.data() as any)?.name : null;
+  await addDoc(activityLogsRef, {
+    action: "delete",
+    entityType: "map",
+    entityCollection: "greenSpaces",
+    entityId: greenSpaceId,
+    entityTitle: name,
+    ...actorMeta(),
+    createdAt: serverTimestamp(),
+    createdAtMs: Date.now(),
   });
 };
 
