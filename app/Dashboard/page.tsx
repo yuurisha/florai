@@ -143,7 +143,7 @@ const MapViewer = dynamic(() => import("../../components/MapViewer"), { ssr: fal
   });
 }, [location, weather, spreadDetails]);
 
-  useEffect(() => {
+  const refreshGreenSpaces = () => {
     let active = true;
     setGreenSpacesLoading(true);
     setGreenSpacesError(null);
@@ -166,7 +166,9 @@ const MapViewer = dynamic(() => import("../../components/MapViewer"), { ssr: fal
     return () => {
       active = false;
     };
-  }, []);
+  };
+
+  useEffect(() => refreshGreenSpaces(), []);
 
 const exportToPDF = async () => {
   if (!lastResult) return;
@@ -288,6 +290,23 @@ const exportToCSV = () => {
     link.click();
 
     window.URL.revokeObjectURL(url);
+  };
+
+  const exportMapImage = async () => {
+    const mapEl = document.getElementById("user-map");
+    if (!mapEl) return;
+
+    const { default: html2canvas } = await import("html2canvas");
+    const canvas = await html2canvas(mapEl, {
+      useCORS: true,
+      backgroundColor: "#ffffff",
+      scale: 2,
+    });
+
+    const link = document.createElement("a");
+    link.href = canvas.toDataURL("image/png");
+    link.download = `green-space-map-${new Date().toISOString().slice(0, 10)}.png`;
+    link.click();
   };
 
   return (
@@ -433,15 +452,26 @@ const exportToCSV = () => {
             <TabsContent value="weather" className="mt-4">
               <Card>
                 <CardHeader>
-                  <CardTitle>Upload Plant Image on Map</CardTitle>
-                  <CardDescription>
-                    Select a hibiscus zone on the map, then upload a plant image for analysis.
-                  </CardDescription>
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <CardTitle>Upload Plant Image on Map</CardTitle>
+                      <CardDescription>
+                        Select a hibiscus zone on the map, then upload a plant image for analysis.
+                      </CardDescription>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={exportMapImage}
+                      className="inline-flex items-center gap-2 rounded border border-green-600 px-3 py-2 text-xs font-semibold text-green-700 hover:bg-green-50"
+                    >
+                      Export Map
+                    </button>
+                  </div>
                 </CardHeader>
                 <CardContent className="p-0">
                   {/* Reuse the same map page logic here */}
                   <div className="h-[70vh] w-full">
-                    <MapClient mode="user" />
+                    <MapClient mode="user" mapId="user-map" />
                   </div>
                 </CardContent>
               </Card>
@@ -468,6 +498,14 @@ const exportToCSV = () => {
                       <span className="rounded-full bg-slate-100 px-2 py-1 text-slate-600">
                         No data: {greenSpaceSummary.noData}
                       </span>
+                      <button
+                        type="button"
+                        onClick={refreshGreenSpaces}
+                        disabled={greenSpacesLoading}
+                        className="inline-flex items-center gap-2 rounded border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:border-gray-200 disabled:text-gray-400"
+                      >
+                        Refresh
+                      </button>
                       <button
                         type="button"
                         onClick={exportGreenSpacesToCSV}

@@ -178,6 +178,7 @@ export default function Page() {
                 mode="admin"
                 onZoneSelect={(zone) => setSelectedZone(zone)}
                 refreshKey={refreshKey}
+                mapId="admin-map"
               />
             </div>
           </div>
