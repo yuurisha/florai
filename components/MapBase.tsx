@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, ChangeEvent } from "react";
+import { useEffect, useRef, useState, ChangeEvent } from "react";
 import "leaflet/dist/leaflet.css";
 import "leaflet-draw/dist/leaflet.draw.css";
 import { getAuth } from "firebase/auth";
@@ -46,10 +46,24 @@ export default function MapBase({ mode, onZoneSelect, refreshKey }: MapBaseProps
     };
   } | null>(null);
 
-  const nextName = useMemo(
-    () => () => "Hibiscus Zone",
-    []
-  );
+  const zonesRef = useRef<HibiscusZone[]>([]);
+
+  useEffect(() => {
+    zonesRef.current = zones;
+  }, [zones]);
+
+  const getNextZoneName = () => {
+    const prefix = "Hibiscus Zone";
+    const zonePattern = new RegExp(`^${prefix}\\s*(\\d+)$`, "i");
+    const maxIndex = zonesRef.current.reduce((max, zone) => {
+      const match = zone.name?.trim().match(zonePattern);
+      if (!match) return max;
+      const value = Number.parseInt(match[1], 10);
+      return Number.isFinite(value) ? Math.max(max, value) : max;
+    }, 0);
+    const nextIndex = maxIndex + 1;
+    return `${prefix} ${String(nextIndex).padStart(3, "0")}`;
+  };
 
   /* ================= MODAL ================= */
   const resetModal = () => {
@@ -211,7 +225,7 @@ const legend = (L as any).control({ position: "topright" });
             .map((p: any) => ({ lat: p.lat, lng: p.lng }));
           try {
             drawnItems.addLayer(e.layer);
-            await createGreenSpace(nextName(), points);
+            await createGreenSpace(getNextZoneName(), points);
             const updated = await fetchGreenSpaces();
             setZones(updated);
             toast.success("Green space created.");
@@ -259,7 +273,7 @@ const legend = (L as any).control({ position: "topright" });
       }
       setMapReady(false);
     };
-  }, [mode, nextName]);
+  }, [mode]);
 
   /* ================= LOAD ZONES ================= */
   useEffect(() => {
