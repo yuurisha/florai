@@ -182,6 +182,7 @@ const legend = (L as any).control({ position: "topright" });
 
       const drawnItems = new L.FeatureGroup();
       map.addLayer(drawnItems);
+      container.__drawn_items__ = drawnItems;
 
       const handlePopupClose = () => {
         onZoneSelect?.(null);
@@ -215,6 +216,7 @@ const legend = (L as any).control({ position: "topright" });
             setZones(updated);
             toast.success("Green space created.");
           } catch (err: any) {
+            drawnItems.removeLayer(e.layer);
             console.error(err);
             toast.error(err?.message ?? "Failed to create green space.");
           }
@@ -252,6 +254,7 @@ const legend = (L as any).control({ position: "topright" });
         delete container.__leaflet_map__;
         delete container.__leaflet_L__;
         delete container.__zones_layer__;
+        delete container.__drawn_items__;
         delete container.__popupclose_handler__;
       }
       setMapReady(false);
@@ -278,8 +281,11 @@ const legend = (L as any).control({ position: "topright" });
     const L = container.__leaflet_L__;
     if (!map || !L) return;
 
+    const drawnItems = container.__drawn_items__;
+    if (drawnItems) drawnItems.clearLayers();
+
     if (container.__zones_layer__) map.removeLayer(container.__zones_layer__);
-    const group = L.layerGroup();
+    const markersGroup = L.layerGroup();
 
     /* ===== STEP 6: COLOR LOGIC ===== */
     const getZoneColor = (z: HibiscusZone) => {
@@ -410,7 +416,11 @@ const legend = (L as any).control({ position: "topright" });
         poly.bindPopup(div).openPopup();
       });
 
-      poly.addTo(group);
+      if (drawnItems) {
+        drawnItems.addLayer(poly);
+      } else {
+        poly.addTo(markersGroup);
+      }
       // ===== ADD CENTER MARKER =====
       const marker = createZoneMarker(z, poly);
 
@@ -419,12 +429,12 @@ const legend = (L as any).control({ position: "topright" });
         poly.fire("click");
       });
 
-      marker.addTo(group);
+      marker.addTo(markersGroup);
 
     });
 
-    group.addTo(map);
-    container.__zones_layer__ = group;
+    markersGroup.addTo(map);
+    container.__zones_layer__ = markersGroup;
   }, [zones, mode, mapReady]);
 
   /* ================= UI ================= */
