@@ -194,8 +194,8 @@ export default function Page() {
         </div>
 
         <aside
-          className={`w-full border-t border-slate-200 bg-white transition-all xl:border-l xl:border-t-0 ${
-            sidebarOpen ? "xl:w-80 xl:p-4" : "xl:w-0 xl:p-0 xl:opacity-0"
+          className={`w-full overflow-hidden border-t border-slate-200 bg-white transition-[width,opacity,padding] duration-300 ease-out xl:border-l xl:border-t-0 ${
+            sidebarOpen ? "xl:w-80 xl:p-4 xl:opacity-100" : "xl:w-0 xl:p-0 xl:opacity-0"
           }`}
           aria-hidden={!sidebarOpen}
         >
