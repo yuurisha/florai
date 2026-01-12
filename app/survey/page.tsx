@@ -12,6 +12,7 @@ import {
 import { db } from "@/lib/firebaseConfig";
 import TopNavBar2 from "@/components/TopNavBar";
 import { getAuth, onAuthStateChanged, User } from "firebase/auth";
+import toast from "react-hot-toast";
 
 interface Survey {
   id: string;
@@ -71,6 +72,7 @@ export default function SurveyListPage() {
       setSurveys(all);
     } catch (error) {
       console.error("Failed to load surveys", error);
+      toast.error("Failed to load surveys. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -232,6 +234,7 @@ export default function SurveyListPage() {
                           type="button"
                           disabled
                           className="inline-flex items-center justify-center bg-gray-100 text-gray-500 px-5 py-2.5 rounded-lg text-sm font-medium cursor-not-allowed"
+                          onClick={() => toast.success("Survey already submitted.")}
                         >
                           Completed
                         </button>

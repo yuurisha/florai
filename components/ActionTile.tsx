@@ -7,15 +7,20 @@ type Props = {
   subtitle?: string;
   icon?: ReactNode;
   onClick?: () => void;
+  disabled?: boolean;
 };
 
-export default function ActionTile({ title, subtitle, icon, onClick }: Props) {
+export default function ActionTile({ title, subtitle, icon, onClick, disabled }: Props) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="group w-full text-left rounded-2xl border border-gray-200 bg-white p-6
-      shadow-sm hover:shadow-md hover:-translate-y-[1px] transition-all"
+      aria-disabled={disabled}
+      className={`group w-full text-left rounded-2xl border border-gray-200 bg-white p-6 shadow-sm transition-all ${
+        disabled
+          ? "cursor-not-allowed opacity-70"
+          : "hover:shadow-md hover:-translate-y-[1px]"
+      }`}
     >
       <div className="flex items-start justify-between gap-4">
         <div>

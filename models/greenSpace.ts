@@ -17,6 +17,7 @@ export interface GreenSpace {
   lastPrediction?: string;
   lastConfidence?: number;
   lastStatus?: "Healthy" | "Diseased";
+  photoUrl?: string | null;
 
   createdAt?: any;
   updatedAt?: any;

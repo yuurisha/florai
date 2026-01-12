@@ -15,6 +15,7 @@ import {
 import { db } from "@/lib/firebaseConfig";
 import TopNavBar2 from "@/components/TopNavBar";
 import { getAuth, onAuthStateChanged, User } from "firebase/auth";
+import toast from "react-hot-toast";
 
 export default function SurveyAnswerPage() {
   const { id } = useParams();
@@ -72,6 +73,7 @@ export default function SurveyAnswerPage() {
     } catch (err) {
       console.error("Failed to load survey or check response:", err);
       setBanner({ type: "error", msg: "Failed to load survey. Please try again." });
+      toast.error("Failed to load survey. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -118,10 +120,12 @@ export default function SurveyAnswerPage() {
       });
 
       setBanner({ type: "success", msg: "Responses submitted. Thank you!" });
+      toast.success("Responses submitted. Thank you!");
       setTimeout(() => router.push("/survey"), 900);
     } catch (error) {
       console.error("Failed to submit survey:", error);
       setBanner({ type: "error", msg: "Failed to submit. Please try again." });
+      toast.error("Failed to submit. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -264,7 +268,7 @@ export default function SurveyAnswerPage() {
                   ? "bg-green-600 text-white hover:bg-green-700"
                   : "bg-gray-200 text-gray-500 cursor-not-allowed",
               ].join(" ")}
-              disabled={!canSubmit}
+              aria-disabled={!canSubmit}
             >
               {submitting ? "Submitting..." : "Submit Survey"}
             </button>

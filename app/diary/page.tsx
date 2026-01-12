@@ -2,9 +2,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import {Trophy, Heart,  Plus,  Flame,  MapPin, Lock, CheckCircle2 } from "lucide-react";
+import { Heart, Plus } from "lucide-react";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
-import Link from "next/link";
+import Image from "next/image";
+import toast from "react-hot-toast";
 import TopNavBar from "@/components/TopNavBar";
 import CalendarView from "@/components/CalendarView";
 import ActionTile from "@/components/ActionTile";
@@ -18,6 +19,8 @@ import {
   saveDiaryEntry,
   deleteDiaryEntry,
   toggleFavouriteDiaryEntry,
+  uploadDiaryEntryImage,
+  updateDiaryEntryMedia,
 } from "@/controller/diaryController";
 
 function todayISO() {
@@ -36,7 +39,8 @@ function isFutureISODate(iso: string) {
 
 
 
-type ModalKey = "create" | "favourites" | "gamification" | null;
+type ModalKey = "create" | "favourites" | null;
+type EntryPanel = "plant" | "entry";
 
 export default function DiaryPage() {
   const [userId, setUserId] = useState<string | null>(null);
@@ -45,22 +49,7 @@ export default function DiaryPage() {
   const isFuture = isFutureISODate(selectedDate);
   const [activeModal, setActiveModal] = useState<ModalKey>(null);
   const [editingEntry, setEditingEntry] = useState<DiaryEntry | null>(null);
-// --- UI-only mock data (replace with Firestore later) ---
-const streak = {
-  currentStreak: 4,
-  longestStreak: 12,
-  lastActionDate: todayISO(), // assume user uploaded today (for UI demo)
-};
-
-const milestones = [7, 30, 100];
-
-const hasUploadedToday = streak.lastActionDate === todayISO();
-
-const nextMilestone =
-  milestones.find((m) => streak.currentStreak < m) ?? milestones[milestones.length - 1];
-
-const progressNumerator = Math.min(streak.currentStreak, nextMilestone);
-const progressPct = Math.round((progressNumerator / nextMilestone) * 100);
+  const [activePanel, setActivePanel] = useState<EntryPanel>("plant");
 
   // For favourites modal preview
   const [selectedFavId, setSelectedFavId] = useState<string | null>(null);
@@ -88,8 +77,14 @@ const progressPct = Math.round((progressNumerator / nextMilestone) * 100);
   }, [sortedFavourites, selectedFavId]);
 
   const refreshEntries = async (uid: string) => {
-    const updated = await fetchDiaryEntries(uid);
-    setEntries(updated);
+    try {
+      const updated = await fetchDiaryEntries(uid);
+      setEntries(updated);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to load diary entries. Please refresh.");
+      setEntries([]);
+    }
   };
 
   useEffect(() => {
@@ -115,10 +110,15 @@ const progressPct = Math.round((progressNumerator / nextMilestone) * 100);
   }, [activeModal, sortedFavourites]);
 
   const openCreate = () => {
-  if (isFutureISODate(selectedDate)) return; // block future
-  setEditingEntry(currentEntry);
-  setActiveModal("create");
-};
+    if (isFutureISODate(selectedDate)) {
+      toast.error("You can't write a diary for a future date.", {
+        style: { background: "#fee2e2", color: "#991b1b" },
+      });
+      return; // block future
+    }
+    setEditingEntry(currentEntry);
+    setActiveModal("create");
+  };
 
 
   const openFavourites = () => {
@@ -132,36 +132,82 @@ const progressPct = Math.round((progressNumerator / nextMilestone) * 100);
     isFavourite: boolean;
     plantName?: string;
     plantCondition?: any;
+    plantNotes?: string;
+    diaryImageFile?: File | null;
+    plantImageFile?: File | null;
+    existingDiaryImageUrl?: string;
+    existingPlantImageUrl?: string;
   }) => {
     if (!userId) return;
+    if (isFutureISODate(selectedDate)) {
+      toast.error("You can't write a diary for a future date.", {
+        style: { background: "#fee2e2", color: "#991b1b" },
+      });
+      return;
+    }
 
     const existing = entries.find((e) => e.date === selectedDate) || undefined;
 
-    await saveDiaryEntry(userId, selectedDate, existing, data);
-    await refreshEntries(userId);
+    const baseData = {
+      title: data.title,
+      text: data.text,
+      isFavourite: data.isFavourite,
+      ...(data.plantName ? { plantName: data.plantName } : {}),
+      ...(data.plantCondition ? { plantCondition: data.plantCondition } : {}),
+      ...(data.plantNotes ? { plantNotes: data.plantNotes } : {}),
+      ...(data.existingDiaryImageUrl ? { imageUrl: data.existingDiaryImageUrl } : {}),
+      ...(data.existingPlantImageUrl ? { plantImageUrl: data.existingPlantImageUrl } : {}),
+    };
 
-    setActiveModal(null);
-    setEditingEntry(null);
+    try {
+      const entryId = await saveDiaryEntry(userId, selectedDate, existing, baseData);
+
+      const updates: { imageUrl?: string; plantImageUrl?: string } = {};
+      if (data.diaryImageFile) {
+        updates.imageUrl = await uploadDiaryEntryImage(entryId, data.diaryImageFile, "diary");
+      }
+      if (data.plantImageFile) {
+        updates.plantImageUrl = await uploadDiaryEntryImage(entryId, data.plantImageFile, "plant");
+      }
+      await updateDiaryEntryMedia(entryId, updates);
+
+      await refreshEntries(userId);
+
+      setActiveModal(null);
+      setEditingEntry(null);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to save diary entry. Please try again.");
+    }
   };
 
   const handleDelete = async (id: string) => {
     if (!userId) return;
 
-    await deleteDiaryEntry(id);
-    await refreshEntries(userId);
+    try {
+      await deleteDiaryEntry(id);
+      await refreshEntries(userId);
 
-    if (selectedFavId === id) setSelectedFavId(null);
+      if (selectedFavId === id) setSelectedFavId(null);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to delete diary entry. Please try again.");
+    }
   };
 
   const handleToggleFav = async (id: string, current: boolean) => {
-    await toggleFavouriteDiaryEntry(id, !current);
-
     if (!userId) return;
-    await refreshEntries(userId);
+    try {
+      await toggleFavouriteDiaryEntry(id, current);
+      await refreshEntries(userId);
 
-    // If we unfavourited the currently previewed one, selection will auto-fix via useEffect
-    if (current === true && selectedFavId === id) {
-      setSelectedFavId(null);
+      // If we unfavourited the currently previewed one, selection will auto-fix via useEffect
+      if (current === true && selectedFavId === id) {
+        setSelectedFavId(null);
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to update favourite. Please try again.");
     }
   };
 
@@ -183,110 +229,6 @@ const progressPct = Math.round((progressNumerator / nextMilestone) * 100);
           <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-12">
             {/* Left action tiles */}
             <div className="lg:col-span-5 space-y-4">
-              <div
-                className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm hover:shadow transition"
-                role="button"
-                tabIndex={0}
-                onClick={() => setActiveModal("gamification")}
-                onKeyDown={(e) => e.key === "Enter" && setActiveModal("gamification")}
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <Flame className="h-5 w-5 text-green-700" />
-                      <h3 className="text-base font-semibold text-gray-900">
-                        Daily Contribution Streak
-                      </h3>
-                    </div>
-
-                    <p className="mt-1 text-sm text-gray-600">
-                      Streak increases when you upload a plant photo on the <b>Map</b> .
-                    </p>
-                  </div>
-
-                  <div className="shrink-0 rounded-2xl bg-green-50 p-3">
-                    <Trophy className="h-6 w-6 text-green-700" />
-                  </div>
-                </div>
-
-                <div className="mt-4 grid grid-cols-2 gap-4">
-                  <div className="rounded-2xl bg-gray-50 p-4">
-                    <p className="text-xs text-gray-500">Current streak</p>
-                    <p className="mt-1 text-2xl font-bold text-gray-900">
-                      {streak.currentStreak} <span className="text-sm font-semibold">days</span>
-                    </p>
-                    <p className="mt-1 text-xs text-gray-500">
-                      Longest: {streak.longestStreak} days
-                    </p>
-                  </div>
-
-                  <div className="rounded-2xl bg-gray-50 p-4">
-                    <p className="text-xs text-gray-500">Today</p>
-                    <div className="mt-2 flex items-center gap-2">
-                      {hasUploadedToday ? (
-                        <>
-                          <CheckCircle2 className="h-4 w-4 text-green-700" />
-                          <p className="text-sm font-semibold text-gray-900">Done ✅</p>
-                        </>
-                      ) : (
-                        <>
-                          <Lock className="h-4 w-4 text-gray-500" />
-                          <p className="text-sm font-semibold text-gray-900">Not yet</p>
-                        </>
-                      )}
-                    </div>
-
-                    <Link
-                      href="/Dashboard"
-                      onClick={(e) => e.stopPropagation()}
-                      className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-green-600 px-3 py-2 text-sm font-semibold text-white hover:bg-green-700"
-                    >
-                      <MapPin className="h-4 w-4" />
-                      Go to Dashboard
-                    </Link>
-
-                  </div>
-                </div>
-
-                <div className="mt-4">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-semibold text-gray-900">
-                      Next badge: {nextMilestone}-day streak
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {progressNumerator}/{nextMilestone} ({progressPct}%)
-                    </p>
-                  </div>
-
-                  <div className="mt-2 h-2 w-full rounded-full bg-gray-100 overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-green-600"
-                      style={{ width: `${progressPct}%` }}
-                    />
-                  </div>
-
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {milestones.map((m) => {
-                      const unlocked = streak.currentStreak >= m;
-                      return (
-                        <span
-                          key={m}
-                          className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold ${
-                            unlocked
-                              ? "border-green-200 bg-green-50 text-green-800"
-                              : "border-gray-200 bg-white text-gray-600"
-                          }`}
-                        >
-                          {unlocked ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />}
-                          {m} days
-                        </span>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-
-
               <div className="grid grid-cols-2 gap-4">
                 <ActionTile
                   title="Favourite Entries"
@@ -302,31 +244,126 @@ const progressPct = Math.round((progressNumerator / nextMilestone) * 100);
                       : "Write for selected date"
                   }
                   icon={<Plus className="h-6 w-6" />}
-                  onClick={isFuture ? undefined : openCreate}
+                  onClick={openCreate}
+                  disabled={isFuture}
                 />
               </div>
 
-              {/* Quick preview (selected day) */}
+              {/* Plant of the day / Diary entry tabs (selected day) */}
               <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-gray-500">Selected day</p>
-                    <p className="text-base font-semibold text-gray-900">
-                      {selectedDate}
-                    </p>
+                <div className="flex flex-col gap-3">
+                  <div className="flex flex-1 items-center rounded-full bg-[#f4f8f4] p-1 shadow-sm">
+                    <button
+                      type="button"
+                      onClick={() => setActivePanel("plant")}
+                      className={`flex-1 rounded-full px-4 py-1.5 text-sm font-semibold transition ${
+                        activePanel === "plant"
+                          ? "bg-[#dcfce5] text-gray-900 shadow-sm ring-1 ring-green-200"
+                          : "bg-transparent text-gray-700"
+                      }`}
+                    >
+                      Plant of the Day
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActivePanel("entry")}
+                      className={`flex-1 rounded-full px-4 py-1.5 text-sm font-semibold transition ${
+                        activePanel === "entry"
+                          ? "bg-[#dcfce5] text-gray-900 shadow-sm ring-1 ring-green-200"
+                          : "bg-transparent text-gray-700"
+                      }`}
+                    >
+                      Diary Entry
+                    </button>
                   </div>
+                  {currentEntry ? (
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleToggleFav(currentEntry.id, !!currentEntry.isFavourite)
+                        }
+                        aria-label={
+                          currentEntry.isFavourite
+                            ? "Remove from favourites"
+                            : "Add to favourites"
+                        }
+                        className={`flex h-9 w-9 items-center justify-center rounded-full border hover:bg-gray-50 ${
+                          currentEntry.isFavourite
+                            ? "border-red-200 text-red-500"
+                            : "border-gray-200 text-gray-600"
+                        }`}
+                      >
+                        <Heart
+                          className="h-4 w-4"
+                          fill={currentEntry.isFavourite ? "currentColor" : "none"}
+                        />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(currentEntry.id)}
+                        className="rounded-full border border-red-300 px-4 py-1.5 text-sm font-semibold text-red-600 hover:bg-red-50"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  ) : null}
                 </div>
 
                 <div className="mt-4">
-                  {currentEntry ? (
-                    <EntryCard
-                      {...currentEntry}
-                      onDelete={() => handleDelete(currentEntry.id)}
-                    />
+                  {activePanel === "plant" ? (
+                    currentEntry ? (
+                      <div className="rounded-2xl border border-gray-100 bg-gray-50/60 p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-xs text-gray-500">{currentEntry.date}</p>
+                          </div>
+                          {currentEntry.plantCondition ? (
+                            <span className="rounded-full border border-green-200 bg-green-50 px-3 py-1 text-xs font-semibold text-green-800">
+                              {currentEntry.plantCondition}
+                            </span>
+                          ) : null}
+                        </div>
+
+                        <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center">
+                          <div className="flex h-28 w-28 items-center justify-center overflow-hidden rounded-2xl border border-gray-200 bg-white">
+                            {currentEntry.plantImageUrl || currentEntry.imageUrl ? (
+                              <Image
+                                src={currentEntry.plantImageUrl || currentEntry.imageUrl || ""}
+                                alt={currentEntry.plantName || "Plant of the day"}
+                                width={112}
+                                height={112}
+                                className="h-full w-full object-cover"
+                              />
+                            ) : (
+                              <span className="text-xs text-gray-500">No photo</span>
+                            )}
+                          </div>
+
+                          <div className="space-y-2 text-sm text-gray-700">
+                            <p className="text-base font-semibold text-gray-900">
+                              {currentEntry.plantName || "Plant name"}
+                            </p>
+                            <p>{currentEntry.plantCondition || "Condition"}</p>
+                            <p className="text-sm text-gray-600 line-clamp-2">
+                              {currentEntry.plantNotes || "Description"}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-5">
+                        <p className="text-sm text-gray-600">
+                          No entry yet for this date. Click <b>Diary entry</b> to start.
+                        </p>
+                      </div>
+                    )
+                  ) : currentEntry ? (
+                    <EntryCard {...currentEntry} />
                   ) : (
-                    <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-5">
+                    <div className="rounded-2xl border border-gray-100 bg-gray-50/60 p-4">
                       <p className="text-sm text-gray-600">
-                        No entry yet for this date. Click <b>Diary entry</b> to start.
+                        No diary entry yet for this date. Click <b>Diary entry</b> to start.
                       </p>
                     </div>
                   )}
@@ -345,74 +382,6 @@ const progressPct = Math.round((progressNumerator / nextMilestone) * 100);
           </div>
         </div>
       </div>
-
-      {/* Gamification Modal */}
-      <Modal
-        open={activeModal === "gamification"}
-        title="Gamification"
-        onClose={() => setActiveModal(null)}
-      >
-        <div className="space-y-4">
-          <div className="rounded-2xl border border-gray-200 bg-white p-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-gray-500">Current streak</p>
-                <p className="text-2xl font-bold text-gray-900">{streak.currentStreak} days</p>
-                <p className="mt-1 text-xs text-gray-500">Longest streak: {streak.longestStreak} days</p>
-              </div>
-              <div className="rounded-2xl bg-green-50 p-4">
-                <Flame className="h-7 w-7 text-green-700" />
-              </div>
-            </div>
-
-            <div className="mt-4 rounded-2xl bg-gray-50 p-4 text-sm text-gray-700">
-              <b>How to earn streaks:</b> Upload at least 1 plant photo on the <b>Map</b> for AI scan.
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-gray-200 bg-white p-5">
-            <p className="text-sm font-semibold text-gray-900">Badges</p>
-            <p className="text-xs text-gray-500">Unlocked badges stay permanently.</p>
-
-            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {milestones.map((m) => {
-                const unlocked = streak.currentStreak >= m;
-                return (
-                  <div
-                    key={m}
-                    className={`rounded-2xl border p-4 ${
-                      unlocked ? "border-green-200 bg-green-50" : "border-gray-200 bg-white"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      {unlocked ? (
-                        <CheckCircle2 className="h-5 w-5 text-green-700" />
-                      ) : (
-                        <Lock className="h-5 w-5 text-gray-500" />
-                      )}
-                      <p className="font-semibold text-gray-900">{m}-Day Streak</p>
-                    </div>
-                    <p className="mt-1 text-xs text-gray-600">
-                      {unlocked ? "Unlocked 🎉" : `Keep going! ${m - streak.currentStreak} more day(s).`}
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="mt-4">
-              <Link
-                href="/map"
-                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700"
-              >
-                <MapPin className="h-4 w-4" />
-                Go to Map Upload
-              </Link>
-            </div>
-          </div>
-        </div>
-
-      </Modal>
 
       {/* Favourites Modal: fixed-size list + preview */}
       <Modal
@@ -499,9 +468,12 @@ const progressPct = Math.round((progressNumerator / nextMilestone) * 100);
           date={selectedDate}
           initialTitle={editingEntry?.title || ""}
           initialText={editingEntry?.text || ""}
+          initialImageUrl={editingEntry?.imageUrl || ""}
           isFavourite={!!editingEntry?.isFavourite}
           initialPlantName={editingEntry?.plantName || ""}
           initialPlantCondition={editingEntry?.plantCondition || "Not sure"}
+          initialPlantNotes={editingEntry?.plantNotes || ""}
+          initialPlantImageUrl={editingEntry?.plantImageUrl || ""}
           onSave={handleSave}
           onCancel={() => {
             setActiveModal(null);

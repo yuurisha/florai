@@ -6,9 +6,12 @@ export type DiaryEntry = {
   date: string; // "YYYY-MM-DD"
   title?: string;
   text: string;
+  imageUrl?: string;
   isFavourite?: boolean;
   plantName?: string;
   plantCondition?: PlantCondition;
+  plantNotes?: string;
+  plantImageUrl?: string;
   createdAt?: any;
   updatedAt?: any;
 };

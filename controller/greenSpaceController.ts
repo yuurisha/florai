@@ -11,6 +11,7 @@ import {
   runTransaction,
   serverTimestamp,
 } from "firebase/firestore";
+import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { GreenSpace, LatLngPoint } from "@/models/greenSpace";
 
 const greenSpacesRef = collection(db, "greenSpaces");
@@ -32,6 +33,7 @@ export const createGreenSpace = async (
     totalUploads: 0,
     healthyUploads: 0,
     healthIndex: 0,
+    photoUrl: null,
   });
 };
 
@@ -99,6 +101,30 @@ export const deleteGreenSpace = async (greenSpaceId: string) => {
   await updateDoc(ref, {
     isActive: false,
   });
+};
+
+export const updateGreenSpaceMeta = async (
+  greenSpaceId: string,
+  updates: { name?: string; photoUrl?: string | null }
+) => {
+  const ref = doc(db, "greenSpaces", greenSpaceId);
+  await updateDoc(ref, { ...updates, updatedAt: serverTimestamp() });
+};
+
+export const uploadGreenSpacePhoto = async (greenSpaceId: string, file: File) => {
+  const storage = getStorage();
+  const storageRef = ref(storage, `greenSpaces/${greenSpaceId}`);
+  await uploadBytes(storageRef, file);
+  const url = await getDownloadURL(storageRef);
+  await updateGreenSpaceMeta(greenSpaceId, { photoUrl: url });
+  return url;
+};
+
+export const removeGreenSpacePhoto = async (greenSpaceId: string) => {
+  const storage = getStorage();
+  const storageRef = ref(storage, `greenSpaces/${greenSpaceId}`);
+  await deleteObject(storageRef).catch(() => null);
+  await updateGreenSpaceMeta(greenSpaceId, { photoUrl: null });
 };
 
 export async function updateGreenSpaceHealth(
