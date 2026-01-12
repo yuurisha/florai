@@ -257,7 +257,7 @@ const exportToCSV = () => {
   </Card>
 )}
 
-  {retryFn && !isLoading && (
+  {retryFn && !isLoading && activeTab === "map" && (
     <Card className="border-red-500">
       <CardHeader>
         <CardTitle>Prediction Failed</CardTitle>
