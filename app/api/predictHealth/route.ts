@@ -77,9 +77,11 @@ export async function POST(req: Request) {
     }
 
     // Optional: keep original status/class/confidence if FastAPI provides them
-    const predictedClass = data?.class ?? data?.predictedClass ?? "Unknown";
-    const confidence = Number(data?.confidence ?? 0);
-
+    const predictedClass = data?.status ?? "Unknown";
+    const confidence =
+  Array.isArray(data?.detections) && data.detections.length > 0
+    ? Math.max(...data.detections.map((d: any) => Number(d?.confidence ?? 0)))
+    : 0;
     return NextResponse.json({
       predictedClass,
       confidence,
