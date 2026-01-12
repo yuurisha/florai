@@ -241,6 +241,55 @@ const exportToCSV = () => {
   window.URL.revokeObjectURL(url);
 };
 
+  const exportGreenSpacesToCSV = () => {
+    if (greenSpaces.length === 0) return;
+
+    const rows = [
+      [
+        "Name",
+        "Health level",
+        "Health %",
+        "Total leaves",
+        "Healthy leaves",
+        "Diseased leaves",
+      ],
+      ...greenSpaces.map((zone) => {
+        const total = zone.totalUploads ?? 0;
+        const healthy = zone.healthyUploads ?? 0;
+        const diseased = Math.max(total - healthy, 0);
+        return [
+          zone.name,
+          getHealthLabel(zone),
+          getHealthPercent(zone),
+          String(total),
+          String(healthy),
+          String(diseased),
+        ];
+      }),
+    ];
+
+    const escapeCSV = (v: string) => {
+      if (v.includes(",") || v.includes('"') || v.includes("\n")) {
+        return `"${v.replace(/"/g, '""')}"`;
+      }
+      return v;
+    };
+
+    const csvContent = rows
+      .map((row) => row.map((cell) => escapeCSV(String(cell))).join(","))
+      .join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = window.URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `green-spaces-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+
+    window.URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-gray-100">
       <div className="w-full bg-green-600 text-white shadow fixed top-0 z-50">
@@ -296,86 +345,6 @@ const exportToCSV = () => {
               </Card>
             </div>
           ) : null}
-
-          <Card>
-            <CardHeader>
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <CardTitle>Green spaces</CardTitle>
-                  <CardDescription>All active zones with health status and uploads.</CardDescription>
-                </div>
-                <div className="flex flex-wrap gap-2 text-xs text-gray-600">
-                  <span className="rounded-full bg-emerald-50 px-2 py-1 text-emerald-700">
-                    Healthy: {greenSpaceSummary.healthy}
-                  </span>
-                  <span className="rounded-full bg-amber-50 px-2 py-1 text-amber-700">
-                    Moderate: {greenSpaceSummary.moderate}
-                  </span>
-                  <span className="rounded-full bg-red-50 px-2 py-1 text-red-700">
-                    Unhealthy: {greenSpaceSummary.unhealthy}
-                  </span>
-                  <span className="rounded-full bg-slate-100 px-2 py-1 text-slate-600">
-                    No data: {greenSpaceSummary.noData}
-                  </span>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {greenSpacesLoading ? (
-                <div className="text-sm text-gray-500">Loading green spaces…</div>
-              ) : greenSpacesError ? (
-                <div className="text-sm text-red-600">{greenSpacesError}</div>
-              ) : greenSpaces.length === 0 ? (
-                <div className="text-sm text-gray-500">No green spaces found.</div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm">
-                    <thead className="bg-gray-50 text-xs uppercase text-gray-500">
-                      <tr>
-                        <th className="px-3 py-2">Name</th>
-                        <th className="px-3 py-2">Health level</th>
-                        <th className="px-3 py-2">Health %</th>
-                        <th className="px-3 py-2">Total leaves</th>
-                        <th className="px-3 py-2">Healthy leaves</th>
-                        <th className="px-3 py-2">Diseased leaves</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {greenSpaces.map((zone) => {
-                        const total = zone.totalUploads ?? 0;
-                        const healthy = zone.healthyUploads ?? 0;
-                        const diseased = Math.max(total - healthy, 0);
-                        const healthLabel = getHealthLabel(zone);
-                        const healthClass =
-                          healthLabel === "Healthy"
-                            ? "bg-emerald-50 text-emerald-700"
-                            : healthLabel === "Moderate"
-                            ? "bg-amber-50 text-amber-700"
-                            : healthLabel === "Unhealthy"
-                            ? "bg-red-50 text-red-700"
-                            : "bg-slate-100 text-slate-600";
-
-                        return (
-                          <tr key={zone.id}>
-                            <td className="px-3 py-3 font-medium text-gray-900">{zone.name}</td>
-                            <td className="px-3 py-3">
-                              <span className={`rounded-full px-2 py-1 text-xs ${healthClass}`}>
-                                {healthLabel}
-                              </span>
-                            </td>
-                            <td className="px-3 py-3">{getHealthPercent(zone)}</td>
-                            <td className="px-3 py-3">{total}</td>
-                            <td className="px-3 py-3">{healthy}</td>
-                            <td className="px-3 py-3">{diseased}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
 
 {isLoading && (
   <Card className="border-yellow-500">
@@ -474,6 +443,98 @@ const exportToCSV = () => {
                   <div className="h-[70vh] w-full">
                     <MapClient mode="user" />
                   </div>
+                </CardContent>
+              </Card>
+
+              <Card className="mt-6">
+                <CardHeader>
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <CardTitle>Green spaces</CardTitle>
+                      <CardDescription>
+                        All active zones with health status and uploads.
+                      </CardDescription>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600">
+                      <span className="rounded-full bg-emerald-50 px-2 py-1 text-emerald-700">
+                        Healthy: {greenSpaceSummary.healthy}
+                      </span>
+                      <span className="rounded-full bg-amber-50 px-2 py-1 text-amber-700">
+                        Moderate: {greenSpaceSummary.moderate}
+                      </span>
+                      <span className="rounded-full bg-red-50 px-2 py-1 text-red-700">
+                        Unhealthy: {greenSpaceSummary.unhealthy}
+                      </span>
+                      <span className="rounded-full bg-slate-100 px-2 py-1 text-slate-600">
+                        No data: {greenSpaceSummary.noData}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={exportGreenSpacesToCSV}
+                        disabled={greenSpacesLoading || greenSpaces.length === 0}
+                        className="ml-2 inline-flex items-center gap-2 rounded border border-green-600 px-3 py-2 text-xs font-semibold text-green-700 hover:bg-green-50 disabled:border-gray-300 disabled:text-gray-400"
+                      >
+                        Export Excel
+                      </button>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {greenSpacesLoading ? (
+                    <div className="text-sm text-gray-500">Loading green spaces…</div>
+                  ) : greenSpacesError ? (
+                    <div className="text-sm text-red-600">{greenSpacesError}</div>
+                  ) : greenSpaces.length === 0 ? (
+                    <div className="text-sm text-gray-500">No green spaces found.</div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-sm">
+                        <thead className="bg-gray-50 text-xs uppercase text-gray-500">
+                          <tr>
+                            <th className="px-3 py-2">Name</th>
+                            <th className="px-3 py-2">Health level</th>
+                            <th className="px-3 py-2">Health %</th>
+                            <th className="px-3 py-2">Total leaves</th>
+                            <th className="px-3 py-2">Healthy leaves</th>
+                            <th className="px-3 py-2">Diseased leaves</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {greenSpaces.map((zone) => {
+                            const total = zone.totalUploads ?? 0;
+                            const healthy = zone.healthyUploads ?? 0;
+                            const diseased = Math.max(total - healthy, 0);
+                            const healthLabel = getHealthLabel(zone);
+                            const healthClass =
+                              healthLabel === "Healthy"
+                                ? "bg-emerald-50 text-emerald-700"
+                                : healthLabel === "Moderate"
+                                ? "bg-amber-50 text-amber-700"
+                                : healthLabel === "Unhealthy"
+                                ? "bg-red-50 text-red-700"
+                                : "bg-slate-100 text-slate-600";
+
+                            return (
+                              <tr key={zone.id}>
+                                <td className="px-3 py-3 font-medium text-gray-900">
+                                  {zone.name}
+                                </td>
+                                <td className="px-3 py-3">
+                                  <span className={`rounded-full px-2 py-1 text-xs ${healthClass}`}>
+                                    {healthLabel}
+                                  </span>
+                                </td>
+                                <td className="px-3 py-3">{getHealthPercent(zone)}</td>
+                                <td className="px-3 py-3">{total}</td>
+                                <td className="px-3 py-3">{healthy}</td>
+                                <td className="px-3 py-3">{diseased}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>
