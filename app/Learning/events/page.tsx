@@ -1,162 +1,146 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
-import { Search, Filter, Calendar, Plus } from "lucide-react"
-import toast from "react-hot-toast"
-import Link from "next/link"
+import { Suspense, useEffect, useState } from "react";
+import { Search, Filter, Calendar, Plus } from "lucide-react";
+import toast from "react-hot-toast";
+import Link from "next/link";
 
-import { Input } from "../../../components/input"
-import { Button } from "../../../components/button"
+import { Input } from "../../../components/input";
+import { Button } from "../../../components/button";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "../../../components/select"
-import { EventCard } from "../../../components/event-card"
-import { EventDetailsModal } from "../../../components/event-details-modal"
-import TopNavbar from "../../../components/TopNavBar"
+} from "../../../components/select";
+import { EventCard } from "../../../components/event-card";
+import { EventDetailsModal } from "../../../components/event-details-modal";
+import TopNavbar from "../../../components/TopNavBar";
 
-import type { Event, EventInterest } from "../../../models/Event"
+import type { Event, EventInterest } from "../../../models/Event";
 import {
   fetchApprovedEvents,
   toggleEventInterest,
-} from "../../../controller/eventController"
+} from "../../../controller/eventController";
 import ReportModal from "@/components/reportModal";
-import { auth } from "../../../lib/firebaseConfig"
+import { auth } from "../../../lib/firebaseConfig";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 
-
-export default function EventsPage() {
-  const [events, setEvents] = useState<Event[]>([])
-  const [filteredEvents, setFilteredEvents] = useState<Event[]>([])
-  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null)
-  const [isModalOpen, setIsModalOpen] = useState(false)
+// ✅ move your existing code here
+function EventsContent() {
+  const [events, setEvents] = useState<Event[]>([]);
+  const [filteredEvents, setFilteredEvents] = useState<Event[]>([]);
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [reportTargetEventId, setReportTargetEventId] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState("")
-  const [categoryFilter, setCategoryFilter] = useState<string>("all")
+  const [searchTerm, setSearchTerm] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
   const eventIdParam = searchParams.get("eventId");
 
-
-  /* =========================
-     Load events from Firestore
-     ========================= */
   useEffect(() => {
     const loadEvents = async () => {
       try {
-        const data = await fetchApprovedEvents()
-        setEvents(data)
-        setFilteredEvents(data)
+        const data = await fetchApprovedEvents();
+        setEvents(data);
+        setFilteredEvents(data);
+
         if (eventIdParam) {
-            const found = data.find((e) => e.id === eventIdParam);
-            if (found) {
-              setSelectedEvent(found);
-              setIsModalOpen(true);
-            }
-            router.replace(pathname); // remove ?eventId so refresh becomes normal
+          const found = data.find((e) => e.id === eventIdParam);
+          if (found) {
+            setSelectedEvent(found);
+            setIsModalOpen(true);
           }
+          router.replace(pathname); // remove ?eventId so refresh becomes normal
+        }
       } catch (err) {
-        console.error(err)
-        toast.error("Failed to load events.")
+        console.error(err);
+        toast.error("Failed to load events.");
       }
-    }
+    };
 
-    loadEvents()
-  }, [])
+    loadEvents();
+  }, []); // ok for now, since you intentionally only want it once
 
-  /* =========================
-     Local filtering (UI sorter)
-     ========================= */
   useEffect(() => {
-    let filtered = events
+    let filtered = events;
 
     if (searchTerm) {
-      const q = searchTerm.toLowerCase()
+      const q = searchTerm.toLowerCase();
       filtered = filtered.filter(
         (event) =>
           event.title.toLowerCase().includes(q) ||
           event.description.toLowerCase().includes(q) ||
-          event.location.toLowerCase().includes(q),
-      )
+          event.location.toLowerCase().includes(q)
+      );
     }
 
     if (categoryFilter !== "all") {
-      filtered = filtered.filter(
-        (event) => event.category === categoryFilter,
-      )
+      filtered = filtered.filter((event) => event.category === categoryFilter);
     }
 
-    setFilteredEvents(filtered)
-  }, [events, searchTerm, categoryFilter])
+    setFilteredEvents(filtered);
+  }, [events, searchTerm, categoryFilter]);
 
-  /* =========================
-     Helpers
-     ========================= */
-  const getUserInterestStatus = (
-    event: Event,
-  ): EventInterest["status"] => {
-    const uid = auth.currentUser?.uid
-    if (!uid) return "none"
-    if (event.interestedUsers?.includes(uid)) return "interested"
-    if (event.notInterestedUsers?.includes(uid)) return "not-interested"
-    return "none"
-  }
+  const getUserInterestStatus = (event: Event): EventInterest["status"] => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return "none";
+    if (event.interestedUsers?.includes(uid)) return "interested";
+    if (event.notInterestedUsers?.includes(uid)) return "not-interested";
+    return "none";
+  };
 
   const handleInterestChange = async (
     eventId: string,
-    clickedStatus: EventInterest["status"],
+    clickedStatus: EventInterest["status"]
   ) => {
-    const uid = auth.currentUser?.uid
+    const uid = auth.currentUser?.uid;
     if (!uid) {
-      toast.error("Please log in to update interest.")
-      return
+      toast.error("Please log in to update interest.");
+      return;
     }
 
-    const event = events.find((e) => e.id === eventId)
-    if (!event) return
+    const event = events.find((e) => e.id === eventId);
+    if (!event) return;
 
-    const currentStatus = getUserInterestStatus(event)
-    const newStatus = currentStatus === clickedStatus ? "none" : clickedStatus
+    const currentStatus = getUserInterestStatus(event);
+    const newStatus = currentStatus === clickedStatus ? "none" : clickedStatus;
 
     try {
-      await toggleEventInterest(eventId, newStatus)
+      await toggleEventInterest(eventId, newStatus);
 
-      // Optimistic UI update
       setEvents((prev) =>
         prev.map((e) => {
-          if (e.id !== eventId) return e
+          if (e.id !== eventId) return e;
 
-          const interestedUsers = e.interestedUsers.filter((id) => id !== uid)
-          const notInterestedUsers = e.notInterestedUsers.filter((id) => id !== uid)
+          const interestedUsers = e.interestedUsers.filter((id) => id !== uid);
+          const notInterestedUsers = e.notInterestedUsers.filter((id) => id !== uid);
 
-          if (newStatus === "interested") interestedUsers.push(uid)
-          if (newStatus === "not-interested") notInterestedUsers.push(uid)
+          if (newStatus === "interested") interestedUsers.push(uid);
+          if (newStatus === "not-interested") notInterestedUsers.push(uid);
 
-          return { ...e, interestedUsers, notInterestedUsers }
-        }),
-      )
+          return { ...e, interestedUsers, notInterestedUsers };
+        })
+      );
 
-      toast.success("Interest updated.")
+      toast.success("Interest updated.");
     } catch (err) {
-      console.error(err)
-      toast.error("Failed to update interest.")
+      console.error(err);
+      toast.error("Failed to update interest.");
     }
-  }
+  };
 
-  /* =========================
-     Render
-     ========================= */
   return (
     <div className="min-h-screen bg-gray-50">
       <TopNavbar />
 
       <div className="container mx-auto px-4 py-8 max-w-7xl">
-        {/* ========= HEADER ========= */}
+        {/* HEADER */}
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">
@@ -175,7 +159,7 @@ export default function EventsPage() {
           </Button>
         </div>
 
-        {/* ========= SEARCH & SORTER ========= */}
+        {/* SEARCH & FILTER */}
         <div className="flex flex-col sm:flex-row gap-4 mb-8">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -204,7 +188,7 @@ export default function EventsPage() {
           </Select>
         </div>
 
-        {/* ========= EVENTS GRID ========= */}
+        {/* EVENTS GRID */}
         {filteredEvents.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredEvents.map((event) => (
@@ -212,8 +196,8 @@ export default function EventsPage() {
                 key={event.id}
                 event={event}
                 onViewDetails={() => {
-                  setSelectedEvent(event)
-                  setIsModalOpen(true)
+                  setSelectedEvent(event);
+                  setIsModalOpen(true);
                 }}
                 onInterestChange={handleInterestChange}
                 userInterestStatus={getUserInterestStatus(event)}
@@ -227,9 +211,7 @@ export default function EventsPage() {
         ) : (
           <div className="text-center py-12">
             <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
-              No events found
-            </h3>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No events found</h3>
             <p className="text-gray-600 mb-4">
               {searchTerm || categoryFilter !== "all"
                 ? "Try adjusting your search or filters"
@@ -244,16 +226,15 @@ export default function EventsPage() {
           </div>
         )}
 
-        {/* ========= DETAILS MODAL ========= */}
+        {/* MODALS */}
         <EventDetailsModal
           event={selectedEvent}
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
           onInterestChange={handleInterestChange}
-          userInterestStatus={
-            selectedEvent ? getUserInterestStatus(selectedEvent) : "none"
-          }
+          userInterestStatus={selectedEvent ? getUserInterestStatus(selectedEvent) : "none"}
         />
+
         <ReportModal
           open={reportOpen}
           onClose={() => {
@@ -265,5 +246,14 @@ export default function EventsPage() {
         />
       </div>
     </div>
-  )
+  );
+}
+
+// ✅ only ONE default export
+export default function EventsPage() {
+  return (
+    <Suspense fallback={<div>Loading events...</div>}>
+      <EventsContent />
+    </Suspense>
+  );
 }
