@@ -38,16 +38,24 @@ export const uploadLeafPhotoAndPredict = async (file: File, greenSpaceId: string
     }
 
     const predictedClass = data?.predictedClass ?? "Unknown";
-    const confidence = Number(data?.confidence ?? 0);
     const status = data?.status as "Healthy" | "Diseased";
+    const summary = {
+      healthy: Number(data?.summary?.healthy ?? 0),
+      diseased: Number(data?.summary?.diseased ?? 0),
+      total: Number(data?.summary?.total ?? 0),
+      healthIndex:
+        typeof data?.summary?.health_index === "number"
+          ? Number(data.summary.health_index)
+          : null,
+    };
 
-    console.log("✅ prediction received:", { predictedClass, confidence, status });
+    console.log("✅ prediction received:", { predictedClass, status });
     
     // Warn if we got default values
-    if (predictedClass === "Unknown" && confidence === 0) {
-      console.warn("⚠️ WARNING: Got default values (Unknown, 0%). FastAPI might not be responding correctly.");
-      console.warn("   Check your Next.js server terminal for FastAPI connection logs.");
-    }
+    //if (predictedClass === "Unknown" && confidence === 0) {
+      //console.warn("⚠️ WARNING: Got default values (Unknown, 0%). FastAPI might not be responding correctly.");
+      //console.warn("   Check your Next.js server terminal for FastAPI connection logs.");
+    //}
 
     // Skip photo upload - only store prediction results
     console.log("2) saving prediction to Firestore (no photo storage)...");
@@ -56,22 +64,18 @@ export const uploadLeafPhotoAndPredict = async (file: File, greenSpaceId: string
       userId: user.uid,
       // No imageUrl - photo is not stored, only prediction results
       predictedClass,
-      confidence,
+      //confidence,
       status,
       createdAt: serverTimestamp(),
     });
 
     console.log("3) updating green space health...");
-    if (confidence >= 0.5) {
-      await updateGreenSpaceHealth(greenSpaceId, status);
-    } else {
-      console.log("ℹ️ skipped stats update due to low confidence:", confidence);
-    }
+    await updateGreenSpaceHealth(greenSpaceId, status);
 
     console.log("DONE ✅");
 
     // Return prediction results (no imageUrl since we're not storing photos)
-    return { predictedClass, confidence, status };
+    return { predictedClass, status, summary };
   } catch (err: any) {
     // This prints the real underlying Firebase error in console
     console.error("❌ uploadLeafPhotoAndPredict error:", err);
