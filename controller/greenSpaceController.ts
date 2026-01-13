@@ -7,7 +7,6 @@ import {
   where,
   updateDoc,
   doc,
-  increment,
   runTransaction,
   serverTimestamp,
   getDoc,
@@ -44,6 +43,7 @@ export const createGreenSpace = async (
     createdBy: user.uid,
     totalUploads: 0,
     healthyUploads: 0,
+    diseasedUploads: 0,
     healthIndex: 0,
     photoUrl: null,
   });
@@ -69,50 +69,6 @@ export const fetchGreenSpaces = async (): Promise<GreenSpace[]> => {
     id: docSnap.id,
     ...(docSnap.data() as Omit<GreenSpace, "id">),
   }));
-};
-
-/* ================= APPLY AI RESULT ================= */
-
-export const applyUploadResultToGreenSpace = async (
-  greenSpaceId: string,
-  result: {
-    predictedClass: string;
-    confidence: number;
-    status: "Healthy" | "Diseased";
-  }
-) => {
-  const ref = doc(db, "greenSpaces", greenSpaceId);
-
-  await runTransaction(db, async (transaction) => {
-    const snap = await transaction.get(ref);
-
-    if (!snap.exists()) {
-      throw new Error("Green space not found");
-    }
-
-    const data = snap.data();
-
-    const prevTotal = data.totalUploads ?? 0;
-    const prevHealthy = data.healthyUploads ?? 0;
-
-    const newTotal = prevTotal + 1;
-    const newHealthy =
-      prevHealthy + (result.status === "Healthy" ? 1 : 0);
-
-    const newHealthIndex = newHealthy / newTotal;
-
-    transaction.update(ref, {
-      totalUploads: newTotal,
-      healthyUploads: newHealthy,
-      healthIndex: newHealthIndex,
-
-      lastPrediction: result.predictedClass,
-      lastConfidence: result.confidence,
-      lastStatus: result.status,
-
-      updatedAt: serverTimestamp(),
-    });
-  });
 };
 
 /* ================= SOFT DELETE ================= */
@@ -165,7 +121,7 @@ export const removeGreenSpacePhoto = async (greenSpaceId: string) => {
 
 export async function updateGreenSpaceHealth(
   greenSpaceId: string,
-  status: "Healthy" | "Diseased"
+  observationStatus: "Healthy" | "Diseased"
 ) {
   const ref = doc(db, "greenSpaces", greenSpaceId);
 
@@ -177,13 +133,16 @@ export async function updateGreenSpaceHealth(
 
     const totalUploads = (data.totalUploads ?? 0) + 1;
     const healthyUploads =
-      (data.healthyUploads ?? 0) + (status === "Healthy" ? 1 : 0);
+      (data.healthyUploads ?? 0) + (observationStatus === "Healthy" ? 1 : 0);
+    const diseasedUploads =
+      (data.diseasedUploads ?? 0) + (observationStatus === "Diseased" ? 1 : 0);
 
     const healthIndex = healthyUploads / totalUploads;
 
     transaction.update(ref, {
       totalUploads,
       healthyUploads,
+      diseasedUploads,
       healthIndex,
       updatedAt: new Date(),
     });
