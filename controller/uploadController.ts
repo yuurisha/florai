@@ -38,7 +38,7 @@ export const uploadLeafPhotoAndPredict = async (file: File, greenSpaceId: string
     }
 
     const predictedClass = data?.predictedClass ?? "Unknown";
-    const status = data?.status as "Healthy" | "Diseased";
+    const status = data?.status as "Healthy" | "Moderate" | "Unhealthy" | "Unknown";
     const summary = {
       healthy: Number(data?.summary?.healthy ?? 0),
       diseased: Number(data?.summary?.diseased ?? 0),
@@ -48,6 +48,13 @@ export const uploadLeafPhotoAndPredict = async (file: File, greenSpaceId: string
           ? Number(data.summary.health_index)
           : null,
     };
+
+    const observationStatus =
+      summary.total > 0
+        ? summary.diseased > 0
+          ? "Diseased"
+          : "Healthy"
+        : "Unknown";
 
     console.log("✅ prediction received:", { predictedClass, status });
     
@@ -66,16 +73,19 @@ export const uploadLeafPhotoAndPredict = async (file: File, greenSpaceId: string
       predictedClass,
       //confidence,
       status,
+      observationStatus,
       createdAt: serverTimestamp(),
     });
 
     console.log("3) updating green space health...");
-    await updateGreenSpaceHealth(greenSpaceId, status);
+    if (observationStatus === "Healthy" || observationStatus === "Diseased") {
+      await updateGreenSpaceHealth(greenSpaceId, observationStatus);
+    }
 
     console.log("DONE ✅");
 
     // Return prediction results (no imageUrl since we're not storing photos)
-    return { predictedClass, status, summary };
+    return { predictedClass, status, observationStatus, summary };
   } catch (err: any) {
     // This prints the real underlying Firebase error in console
     console.error("❌ uploadLeafPhotoAndPredict error:", err);
