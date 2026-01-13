@@ -12,7 +12,7 @@ import {
   uploadGreenSpacePhoto,
 } from "@/controller/greenSpaceController";
 import { fetchGreenSpaces } from "@/controller/greenSpaceController";
-import { collection, getDocs, limit, orderBy, query, where } from "firebase/firestore";
+import { collection, getDocs, limit, orderBy, query } from "firebase/firestore";
 import { db } from "@/lib/firebaseConfig";
 
 type DrawAction = "draw" | "edit" | "delete";
@@ -77,20 +77,27 @@ export default function Page() {
     setTableError(null);
     try {
       const zones = await fetchGreenSpaces();
+      const zoneIds = new Set(zones.map((zone) => zone.id));
+      const latestUploads = new Map<string, any>();
+
       const uploadsRef = collection(db, "uploads");
-      const rows = await Promise.all(
-        zones.map(async (zone) => {
-          const latestQ = query(
-            uploadsRef,
-            where("greenSpaceId", "==", zone.id),
-            orderBy("createdAt", "desc"),
-            limit(1)
-          );
-          const snap = await getDocs(latestQ);
-          const latest = snap.docs[0]?.data()?.createdAt ?? null;
-          return { zone, latestUpload: latest };
-        })
+      const uploadsSnap = await getDocs(
+        query(uploadsRef, orderBy("createdAt", "desc"), limit(500))
       );
+
+      uploadsSnap.docs.forEach((docSnap) => {
+        const data = docSnap.data() as any;
+        const greenSpaceId = data?.greenSpaceId as string | undefined;
+        if (!greenSpaceId || !zoneIds.has(greenSpaceId)) return;
+        if (latestUploads.has(greenSpaceId)) return;
+        latestUploads.set(greenSpaceId, data?.createdAt ?? null);
+      });
+
+      const rows = zones.map((zone) => ({
+        zone,
+        latestUpload: latestUploads.get(zone.id) ?? null,
+      }));
+
       setTableRows(rows);
     } catch (err: any) {
       console.error(err);
