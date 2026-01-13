@@ -55,14 +55,14 @@ const HeatmapLayer = ({ points }: { points: [number, number, number][] }) => {
       blur: 20,
       maxZoom: 17,
       minOpacity: 0.4,
+      max: 1.0,  // Set explicit max value
       gradient: {
-      0.0: "green",
-      0.33: "green",
-      0.34: "orange",
-      0.66: "orange",
-      0.67: "red",
-      1.0: "red",
-    },
+        0.0: "green",
+        0.4: "yellow",
+        0.6: "orange",
+        0.8: "red",
+        1.0: "darkred",
+      },
     }).addTo(map);
 
     return () => {
@@ -196,9 +196,9 @@ export default function MapViewer({
             }
 
             function riskToIntensity(risk: string) {
-              if (risk === "High") return 0.85;
-              if (risk === "Medium") return 0.55;
-              return 0.25; // Low (default)
+              if (risk === "High") return 0.9;
+              if (risk === "Medium") return 0.5;
+              return 0.2; // Low (default)
             }
 
             // Heatmap intensity
