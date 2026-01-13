@@ -12,6 +12,7 @@ export interface GreenSpace {
 
   totalUploads: number;
   healthyUploads: number;
+  diseasedUploads?: number;
   healthIndex: number;
 
   lastPrediction?: string;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, ChangeEvent } from "react";
+import { useEffect, useRef, useState, ChangeEvent } from "react";
 import "leaflet/dist/leaflet.css";
 import "leaflet-draw/dist/leaflet.draw.css";
 import { getAuth } from "firebase/auth";
@@ -23,9 +23,11 @@ type MapBaseProps = {
   mode: Mode;
   onZoneSelect?: (zone: GreenSpace | null) => void;
   refreshKey?: number;
+  mapId?: string;
 };
 
-export default function MapBase({ mode, onZoneSelect, refreshKey }: MapBaseProps) {
+export default function MapBase({ mode, onZoneSelect, refreshKey, mapId }: MapBaseProps) {
+  const mapElementId = mapId ?? "map";
   const [mapReady, setMapReady] = useState(false);
   const [zones, setZones] = useState<HibiscusZone[]>([]);
 
@@ -46,10 +48,24 @@ export default function MapBase({ mode, onZoneSelect, refreshKey }: MapBaseProps
     };
   } | null>(null);
 
-  const nextName = useMemo(
-    () => () => "Hibiscus Zone",
-    []
-  );
+  const zonesRef = useRef<HibiscusZone[]>([]);
+
+  useEffect(() => {
+    zonesRef.current = zones;
+  }, [zones]);
+
+  const getNextZoneName = () => {
+    const prefix = "Hibiscus Zone";
+    const zonePattern = new RegExp(`^${prefix}\\s*(\\d+)$`, "i");
+    const maxIndex = zonesRef.current.reduce((max, zone) => {
+      const match = zone.name?.trim().match(zonePattern);
+      if (!match) return max;
+      const value = Number.parseInt(match[1], 10);
+      return Number.isFinite(value) ? Math.max(max, value) : max;
+    }, 0);
+    const nextIndex = maxIndex + 1;
+    return `${prefix} ${String(nextIndex).padStart(3, "0")}`;
+  };
 
   /* ================= MODAL ================= */
   const resetModal = () => {
@@ -128,15 +144,16 @@ export default function MapBase({ mode, onZoneSelect, refreshKey }: MapBaseProps
 
       if (cancelled) return;
 
-      const container = document.getElementById("map") as any;
+      const container = document.getElementById(mapElementId) as any;
       if (!container || container.dataset.initialized) return;
       container.dataset.initialized = "true";
 
-      const map = L.map("map").setView([3.1208, 101.6544], 15);
+      const map = L.map(mapElementId).setView([3.1208, 101.6544], 15);
 
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 19,
         attribution: "© OpenStreetMap contributors",
+        crossOrigin: true,
       }).addTo(map);
 
       /* ================= STEP 7: LEGEND ================= */
@@ -192,7 +209,7 @@ const legend = (L as any).control({ position: "topright" });
       /* ===== ADMIN DRAW ===== */
       if (mode === "admin") {
         const drawControl = new (L as any).Control.Draw({
-          edit: { featureGroup: drawnItems },
+          edit: false,
           draw: {
             polygon: true,
             rectangle: false,
@@ -211,7 +228,7 @@ const legend = (L as any).control({ position: "topright" });
             .map((p: any) => ({ lat: p.lat, lng: p.lng }));
           try {
             drawnItems.addLayer(e.layer);
-            await createGreenSpace(nextName(), points);
+            await createGreenSpace(getNextZoneName(), points);
             const updated = await fetchGreenSpaces();
             setZones(updated);
             toast.success("Green space created.");
@@ -234,7 +251,7 @@ const legend = (L as any).control({ position: "topright" });
 
     return () => {
       cancelled = true;
-      const container = document.getElementById("map") as any;
+      const container = document.getElementById(mapElementId) as any;
 
       if (container?.__legend__) {
         try {
@@ -259,7 +276,7 @@ const legend = (L as any).control({ position: "topright" });
       }
       setMapReady(false);
     };
-  }, [mode, nextName]);
+  }, [mapElementId, mode]);
 
   /* ================= LOAD ZONES ================= */
   useEffect(() => {
@@ -276,7 +293,7 @@ const legend = (L as any).control({ position: "topright" });
   useEffect(() => {
     if (!mapReady) return;
 
-    const container = document.getElementById("map") as any;
+    const container = document.getElementById(mapElementId) as any;
     const map = container.__leaflet_map__;
     const L = container.__leaflet_L__;
     if (!map || !L) return;
@@ -435,22 +452,13 @@ const legend = (L as any).control({ position: "topright" });
 
     markersGroup.addTo(map);
     container.__zones_layer__ = markersGroup;
-  }, [zones, mode, mapReady]);
+  }, [zones, mode, mapReady, mapElementId]);
 
   /* ================= UI ================= */
   return (
     <>
       <div className="relative h-full w-full">
-        <div id="map" style={{ height: "100%", width: "100%" }} />
-        {mode === "user" ? (
-          <button
-            type="button"
-            onClick={() => alert("Export map will be available soon.")}
-            className="absolute right-4 top-4 z-[1000] rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs font-semibold text-emerald-800 shadow-sm hover:bg-emerald-50"
-          >
-            Export Map
-          </button>
-        ) : null}
+        <div id={mapElementId} style={{ height: "100%", width: "100%" }} />
       </div>
 
       {isModalOpen && (

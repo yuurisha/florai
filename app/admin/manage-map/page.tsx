@@ -11,6 +11,9 @@ import {
   updateGreenSpaceMeta,
   uploadGreenSpacePhoto,
 } from "@/controller/greenSpaceController";
+import { fetchGreenSpaces } from "@/controller/greenSpaceController";
+import { collection, getDocs, limit, orderBy, query } from "firebase/firestore";
+import { db } from "@/lib/firebaseConfig";
 
 type DrawAction = "draw" | "edit" | "delete";
 
@@ -36,6 +39,124 @@ export default function Page() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [pendingPhotoFile, setPendingPhotoFile] = useState<File | null>(null);
   const [pendingPhotoUrl, setPendingPhotoUrl] = useState<string | null>(null);
+  const [showTable, setShowTable] = useState(false);
+  const [tableLoading, setTableLoading] = useState(false);
+  const [tableError, setTableError] = useState<string | null>(null);
+  const [tableRows, setTableRows] = useState<
+    { zone: GreenSpace; latestUpload: string | null }[]
+  >([]);
+
+  const getHealthLabel = (zone: GreenSpace) => {
+    const total = zone.totalUploads ?? 0;
+    if (total === 0) return "No data";
+    if ((zone.healthIndex ?? 0) >= 0.8) return "Healthy";
+    if ((zone.healthIndex ?? 0) >= 0.6) return "Moderate";
+    return "Unhealthy";
+  };
+
+  const getHealthPercent = (zone: GreenSpace) => {
+    const total = zone.totalUploads ?? 0;
+    if (total === 0) return "--";
+    return `${Math.round((zone.healthIndex ?? 0) * 100)}%`;
+  };
+
+  const formatUploadDate = (value: any) => {
+    try {
+      if (value && typeof value.toDate === "function") {
+        return value.toDate().toLocaleString();
+      }
+      if (typeof value === "number") {
+        return new Date(value).toLocaleString();
+      }
+    } catch {}
+    return "—";
+  };
+
+  const refreshTable = async () => {
+    setTableLoading(true);
+    setTableError(null);
+    try {
+      const zones = await fetchGreenSpaces();
+      const zoneIds = new Set(zones.map((zone) => zone.id));
+      const latestUploads = new Map<string, any>();
+
+      const uploadsRef = collection(db, "uploads");
+      const uploadsSnap = await getDocs(
+        query(uploadsRef, orderBy("createdAt", "desc"), limit(500))
+      );
+
+      uploadsSnap.docs.forEach((docSnap) => {
+        const data = docSnap.data() as any;
+        const greenSpaceId = data?.greenSpaceId as string | undefined;
+        if (!greenSpaceId || !zoneIds.has(greenSpaceId)) return;
+        if (latestUploads.has(greenSpaceId)) return;
+        latestUploads.set(greenSpaceId, data?.createdAt ?? null);
+      });
+
+      const rows = zones.map((zone) => ({
+        zone,
+        latestUpload: latestUploads.get(zone.id) ?? null,
+      }));
+
+      setTableRows(rows);
+    } catch (err: any) {
+      console.error(err);
+      setTableError("Failed to load table data.");
+    } finally {
+      setTableLoading(false);
+    }
+  };
+
+  const exportTableToCSV = () => {
+    if (tableRows.length === 0) return;
+
+    const rows = [
+      [
+        "Name",
+        "Health level",
+        "Health %",
+        "Total leaves",
+        "Healthy leaves",
+        "Diseased leaves",
+        "Latest photo upload",
+      ],
+      ...tableRows.map(({ zone, latestUpload }) => {
+        const total = zone.totalUploads ?? 0;
+        const healthy = zone.healthyUploads ?? 0;
+        const diseased = Math.max(total - healthy, 0);
+        return [
+          zone.name,
+          getHealthLabel(zone),
+          getHealthPercent(zone),
+          String(total),
+          String(healthy),
+          String(diseased),
+          latestUpload ? formatUploadDate(latestUpload) : "—",
+        ];
+      }),
+    ];
+
+    const escapeCSV = (v: string) => {
+      if (v.includes(",") || v.includes('"') || v.includes("\n")) {
+        return `"${v.replace(/"/g, '""')}"`;
+      }
+      return v;
+    };
+
+    const csvContent = rows
+      .map((row) => row.map((cell) => escapeCSV(String(cell))).join(","))
+      .join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = window.URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `green-spaces-admin-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+
+    window.URL.revokeObjectURL(url);
+  };
 
   useEffect(() => {
     setZoneName(selectedZone?.name ?? "");
@@ -52,12 +173,15 @@ export default function Page() {
   }, [sidebarOpen]);
 
   useEffect(() => {
+    if (!showTable) return;
+    refreshTable();
+  }, [showTable, refreshKey]);
+
+  useEffect(() => {
     let cancelled = false;
     const interval = window.setInterval(() => {
       const hasDraw = document.querySelector(".leaflet-draw-draw-polygon");
-      const hasEdit = document.querySelector(".leaflet-draw-edit-edit");
-      const hasDelete = document.querySelector(".leaflet-draw-edit-remove");
-      if (hasDraw && hasEdit && hasDelete && !cancelled) {
+      if (hasDraw && !cancelled) {
         setDrawReady(true);
         window.clearInterval(interval);
       }
@@ -171,21 +295,124 @@ export default function Page() {
         <AdminTopNavBar />
       </div>
       <div className="relative z-0 flex h-[calc(100vh-4rem)] flex-col bg-slate-50 xl:flex-row">
-        <div className="relative flex-1 p-4">
+        <div className="relative flex-1 p-4 space-y-4">
           <div className="h-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
             <div className="h-full w-full">
               <MapClient
                 mode="admin"
                 onZoneSelect={(zone) => setSelectedZone(zone)}
                 refreshKey={refreshKey}
+                mapId="admin-map"
               />
             </div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 className="text-base font-semibold text-slate-900">
+                  Green Space Table
+                </h3>
+                <p className="text-xs text-slate-600">
+                  Health summary with latest photo upload time.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setShowTable((v) => !v)}
+                  className="inline-flex items-center gap-2 rounded border border-slate-300 px-3 py-2 font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  {showTable ? "Hide Table" : "Show Table"}
+                </button>
+                <button
+                  type="button"
+                  onClick={refreshTable}
+                  disabled={!showTable || tableLoading}
+                  className="inline-flex items-center gap-2 rounded border border-slate-300 px-3 py-2 font-semibold text-slate-700 hover:bg-slate-50 disabled:border-slate-200 disabled:text-slate-400"
+                >
+                  Refresh
+                </button>
+                <button
+                  type="button"
+                  onClick={exportTableToCSV}
+                  disabled={!showTable || tableLoading || tableRows.length === 0}
+                  className="inline-flex items-center gap-2 rounded border border-green-600 px-3 py-2 font-semibold text-green-700 hover:bg-green-50 disabled:border-slate-200 disabled:text-slate-400"
+                >
+                  Export Excel
+                </button>
+              </div>
+            </div>
+
+            {showTable ? (
+              <div className="mt-4">
+                {tableLoading ? (
+                  <div className="text-sm text-slate-600">Loading table…</div>
+                ) : tableError ? (
+                  <div className="text-sm text-red-600">{tableError}</div>
+                ) : tableRows.length === 0 ? (
+                  <div className="text-sm text-slate-600">No green spaces found.</div>
+                ) : (
+                  <div className="overflow-x-auto rounded-xl border border-slate-200">
+                    <table className="min-w-full text-sm">
+                      <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
+                        <tr>
+                          <th className="px-3 py-2">Name</th>
+                          <th className="px-3 py-2">Health level</th>
+                          <th className="px-3 py-2">Health %</th>
+                          <th className="px-3 py-2">Total leaves</th>
+                          <th className="px-3 py-2">Healthy leaves</th>
+                          <th className="px-3 py-2">Diseased leaves</th>
+                          <th className="px-3 py-2">Latest photo upload</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200">
+                        {tableRows.map(({ zone, latestUpload }) => {
+                          const total = zone.totalUploads ?? 0;
+                          const healthy = zone.healthyUploads ?? 0;
+                          const diseased = Math.max(total - healthy, 0);
+                          const healthLabel = getHealthLabel(zone);
+                          const healthClass =
+                            healthLabel === "Healthy"
+                              ? "bg-emerald-50 text-emerald-700"
+                              : healthLabel === "Moderate"
+                              ? "bg-amber-50 text-amber-700"
+                              : healthLabel === "Unhealthy"
+                              ? "bg-red-50 text-red-700"
+                              : "bg-slate-100 text-slate-600";
+
+                          return (
+                            <tr key={zone.id} className="bg-white">
+                              <td className="px-3 py-3 font-medium text-slate-900">
+                                {zone.name}
+                              </td>
+                              <td className="px-3 py-3">
+                                <span className={`rounded-full px-2 py-1 text-xs ${healthClass}`}>
+                                  {healthLabel}
+                                </span>
+                              </td>
+                              <td className="px-3 py-3">{getHealthPercent(zone)}</td>
+                              <td className="px-3 py-3">{total}</td>
+                              <td className="px-3 py-3">{healthy}</td>
+                              <td className="px-3 py-3">{diseased}</td>
+                              <td className="px-3 py-3">
+                                {latestUpload ? formatUploadDate(latestUpload) : "—"}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            ) : null}
           </div>
 
           <button
             type="button"
             onClick={() => setSidebarOpen((v) => !v)}
-            className="absolute right-2 top-1/2 z-[1000] flex h-12 w-9 -translate-y-1/2 items-center justify-center rounded-l-xl border border-slate-200 bg-white text-lg font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+            className="absolute right-2 top-1/2 z-[1000] hidden h-12 w-9 -translate-y-1/2 items-center justify-center rounded-l-xl border border-slate-200 bg-white text-lg font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 xl:flex"
             aria-label={sidebarOpen ? "Hide panel" : "Show panel"}
           >
             {sidebarOpen ? "›" : "‹"}
@@ -193,8 +420,8 @@ export default function Page() {
         </div>
 
         <aside
-          className={`w-full border-t border-slate-200 bg-white transition-all xl:border-l xl:border-t-0 ${
-            sidebarOpen ? "xl:w-80 xl:p-4" : "xl:w-0 xl:p-0 xl:opacity-0"
+          className={`w-full overflow-hidden border-t border-slate-200 bg-white xl:border-l xl:border-t-0 xl:transition-[width,opacity,padding] xl:duration-300 xl:ease-out ${
+            sidebarOpen ? "xl:w-80 xl:p-4 xl:opacity-100" : "xl:w-0 xl:p-0 xl:opacity-0"
           }`}
           aria-hidden={!sidebarOpen}
         >
