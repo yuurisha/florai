@@ -29,6 +29,7 @@ interface MapViewerProps {
   setSpreadDetails: React.Dispatch<React.SetStateAction<{
     riskLevel: string;
     spreadDistance: string;
+    aiConfidence?: number;
   }>>;
   setLocation: React.Dispatch<React.SetStateAction<{
     latitude: string;
@@ -195,6 +196,7 @@ export default function MapViewerWithAI({
         setSpreadDetails({
           riskLevel: aiData.likelihood, // "Low", "Medium", or "High"
           spreadDistance: `${(aiData.confidence * 10).toFixed(1)} km`, // Use confidence as spread estimate
+          aiConfidence: aiData.confidence, // Add confidence score
         });
 
         // Add center point to heatmap

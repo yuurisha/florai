@@ -116,6 +116,7 @@ export default function DashboardClientWithAI() {
       rainfall: weather.rainfall,
       riskLevel: spreadDetails.riskLevel,
       spreadDistance: spreadDetails.spreadDistance,
+      aiConfidence: (spreadDetails as any).aiConfidence,
       createdAt: new Date().toISOString(),
     });
   }, [location, weather, spreadDetails]);
@@ -284,6 +285,14 @@ export default function DashboardClientWithAI() {
                 <CardTitle>Predicted Spread Distance</CardTitle>
               </CardHeader>
               <CardContent>{spreadDetails.spreadDistance}</CardContent>
+            </Card>
+            <Card className="bg-purple-50 border-purple-300">
+              <CardHeader>
+                <CardTitle>AI Confidence Score</CardTitle>
+              </CardHeader>
+              <CardContent className="text-lg font-bold text-purple-700">
+                {lastResult?.aiConfidence ? `${(lastResult.aiConfidence * 100).toFixed(1)}%` : "--"}
+              </CardContent>
             </Card>
           </div>
 

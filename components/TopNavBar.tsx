@@ -12,7 +12,7 @@ import { useEffect, useState } from "react";
 const links = [
   { href: "/home", label: "Home" },
   { href: "/profile", label: "Profile" },
-  { href: "/Dashboard", label: "Dashboard" },
+  { href: "/Dashboard/ai", label: "Dashboard" },
   { href: "/Learning", label: "Learning" },
   { href: "/notifications", label: "Notification Centre" },
   { href: "/survey", label: "Survey" },
