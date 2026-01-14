@@ -1,7 +1,7 @@
 import type { PredictionSummary } from "./Prediction";
 import type { ReportSummary } from "./Report";
 
-export type NotificationType = "ai_alert" | "user_report";
+export type NotificationType = "ai_alert" | "user_report" | "um_special_alert";
 
 export interface Notification {
   _id: string;

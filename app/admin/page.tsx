@@ -44,6 +44,8 @@ const ENTITY_TYPES = [
   { label: "All", value: "all" },
   { label: "Tip", value: "learningTip" },
   { label: "Resource", value: "learningResource" },
+  { label: "Map", value: "map" },
+  { label: "Event", value: "event" },
   { label: "User", value: "user" },
 ];
 
@@ -60,6 +62,8 @@ export default function AdminPage() {
   const [actionFilter, setActionFilter] = useState<string>("all");
   const [entityFilter, setEntityFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const LOGS_PER_PAGE = 20;
 
   const [stats, setStats] = useState({
     userCount: 0,
@@ -192,9 +196,29 @@ export default function AdminPage() {
     });
   }, [logs, search, actionFilter, entityFilter]);
 
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, actionFilter, entityFilter]);
+
+  // Paginate filtered logs
+  const paginatedLogs = useMemo(() => {
+    const startIdx = (currentPage - 1) * LOGS_PER_PAGE;
+    return filteredLogs.slice(startIdx, startIdx + LOGS_PER_PAGE);
+  }, [filteredLogs, currentPage, LOGS_PER_PAGE]);
+
+  const totalPages = Math.ceil(filteredLogs.length / LOGS_PER_PAGE);
+
   const handleLogout = async () => {
     try {
       await signOut(auth);
+      
+      // Clear all cookies
+      document.cookie = "firebaseToken=; Max-Age=0; path=/; SameSite=Lax";
+      document.cookie = "userRole=; Max-Age=0; path=/; SameSite=Lax";
+      
+      // Clear localStorage
+      localStorage.clear();
     } finally {
       router.push("/login");
     }
@@ -298,7 +322,7 @@ export default function AdminPage() {
 
                 <Select value={actionFilter} onValueChange={setActionFilter}>
                   <SelectTrigger className="w-full justify-between">
-                    <SelectValue placeholder="Filter action" />
+                    {ACTIONS.find(a => a.value === actionFilter)?.label || "Filter action"}
                   </SelectTrigger>
                   <SelectContent className="z-50 max-h-64 w-48 overflow-y-auto">
                     {ACTIONS.map((a) => (
@@ -318,7 +342,7 @@ export default function AdminPage() {
 
                 <Select value={entityFilter} onValueChange={setEntityFilter}>
                   <SelectTrigger className="w-full justify-between">
-                    <SelectValue placeholder="Filter entity" />
+                    {ENTITY_TYPES.find(t => t.value === entityFilter)?.label || "Filter entity"}
                   </SelectTrigger>
                   <SelectContent className="z-50 max-h-64 w-48 overflow-y-auto">
                     {ENTITY_TYPES.map((t) => (
@@ -364,7 +388,7 @@ export default function AdminPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y">
-                    {filteredLogs.map((r) => (
+                    {paginatedLogs.map((r) => (
                       <tr key={r.id} className="bg-white">
                         <td className="px-4 py-3 text-gray-800 whitespace-nowrap">
                           {formatTs(r.createdAt, (r as any).createdAtMs)}
@@ -395,8 +419,35 @@ export default function AdminPage() {
               </div>
             )}
 
-            <div className="text-xs text-gray-500">
-              Showing {filteredLogs.length} / {logs.length} logs (live).
+            {/* Pagination Controls */}
+            <div className="flex items-center justify-between text-sm">
+              <div className="text-gray-500">
+                Showing {paginatedLogs.length > 0 ? (currentPage - 1) * LOGS_PER_PAGE + 1 : 0} to {Math.min(currentPage * LOGS_PER_PAGE, filteredLogs.length)} of {filteredLogs.length} logs
+              </div>
+              
+              {totalPages > 1 && (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="rounded-md px-3 py-1 text-sm font-semibold bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Previous
+                  </button>
+                  
+                  <span className="text-gray-700">
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  
+                  <button
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className="rounded-md px-3 py-1 text-sm font-semibold bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -414,6 +465,10 @@ function labelForEntity(entityType?: string) {
       return "Tip";
     case "learningresource":
       return "Resource";
+    case "greenspace":
+      return "Green Space";
+    case "event":
+      return "Event";
     case "user":
       return "User";
     default:

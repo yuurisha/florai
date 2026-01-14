@@ -5,6 +5,9 @@ import Link from "next/link";
 import TopNavBar from "../../components/TopNavBar";
 // import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuth } from "../../context/AuthContext";
+import { useEffect, useState } from "react";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "../../lib/firebaseConfig";
 import {
   ImagePlus,
   ActivitySquare,
@@ -17,6 +20,30 @@ import {
 
 export default function HomePage() {
 const { user, loading } = useAuth();
+const [username, setUsername] = useState<string | null>(null);
+
+// Fetch user's full name from Firestore
+useEffect(() => {
+  if (!user?.uid) return;
+  
+  // Set initial value from Firebase Auth immediately
+  setUsername(user.displayName || "User");
+  
+  const fetchUserName = async () => {
+    try {
+      const userDoc = await getDoc(doc(db, "users", user.uid));
+      if (userDoc.exists()) {
+        const data = userDoc.data();
+        setUsername(data?.fullName || user.displayName || "User");
+      }
+    } catch (error) {
+      console.error("Error fetching user name:", error);
+    }
+  };
+  
+  fetchUserName();
+}, [user]);
+
 // console.log("Auth state:", { user, loading });
   if (loading) {
     return (
@@ -26,15 +53,13 @@ const { user, loading } = useAuth();
     );
   }
 
-  const username = user?.displayName || "User";
-
 
   return (
       <div className="min-h-screen bg-gray-100">
         <TopNavBar />
         <main className="max-w-5xl mx-auto px-4 pt-24 pb-12">
           <h1 className="text-3xl font-bold text-green-700 mb-4">
-            Welcome back, {username}! 👋
+            Welcome back, {username || user?.displayName || "User"}! 👋
           </h1>
           <p className="text-gray-600 mb-10">Here’s what you can do today:</p>
 

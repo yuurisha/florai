@@ -10,10 +10,24 @@ import {
   doc,
   serverTimestamp,
   deleteDoc,
+  getDoc,
+  writeBatch,
 } from "firebase/firestore";
 import { db } from "../lib/firebaseConfig";
 import { auth } from "../lib/firebaseConfig";
 import type { Event, EventInterest } from "../models/Event";
+
+const activityLogsRef = collection(db, "activityLogs");
+
+function actorMeta() {
+  const user = auth.currentUser;
+  if (!user) throw new Error("Not authenticated");
+  return {
+    actorUid: user.uid,
+    actorEmail: user.email ?? null,
+    actorName: user.displayName ?? null,
+  };
+}
 
 /**
  * Create a new event
@@ -157,9 +171,30 @@ export async function rejectEvent(eventId: string) {
 }
 
 export async function deleteEvent(eventId: string) {
-  const user = auth.currentUser
-  if (!user) throw new Error("Not authenticated")
+  const user = auth.currentUser;
+  if (!user) throw new Error("Not authenticated");
 
-  // OPTIONAL: check admin role here
-  await deleteDoc(doc(db, "events", eventId))
+  const eventRef = doc(db, "events", eventId);
+  const snap = await getDoc(eventRef);
+  if (!snap.exists()) return;
+
+  const eventData = snap.data();
+
+  const batch = writeBatch(db);
+  
+  // Log deletion
+  batch.set(doc(activityLogsRef), {
+    action: "delete",
+    entityType: "event",
+    entityCollection: "events",
+    entityId: eventId,
+    entityTitle: eventData.title ?? null,
+    deletedData: eventData,
+    ...actorMeta(),
+    createdAt: serverTimestamp(),
+    createdAtMs: Date.now(),
+  });
+
+  batch.delete(eventRef);
+  await batch.commit();
 }

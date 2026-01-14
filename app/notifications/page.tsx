@@ -2,20 +2,81 @@
 
 import TopNavbar from "@/components/TopNavBar";
 import { useNotifications } from "@/context/NotificationContext";
+import { NotificationPreferences } from "@/models/Notifications";
 import Link from "next/link";
 import toast from "react-hot-toast";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function NotificationLogPage() {
-  const { notifications, markAsRead, markAllAsRead } = useNotifications();
+  const { notifications, markAsRead, markAllAsRead, preferences, setPreferences } = useNotifications();
   const [loading, setLoading] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const NOTIFICATIONS_PER_PAGE = 20;
+  
+  // Filter states
+  const [filterType, setFilterType] = useState<"realtime" | "daily" | "weekly">("realtime");
+  const [selectedDate, setSelectedDate] = useState<string>("");
+  const [selectedWeek, setSelectedWeek] = useState<string>("");
 
-  // Sort newest → oldest safely
-  const sorted = [...notifications].sort((a, b) => {
-    const da = a?.createdAt ? new Date(a.createdAt).getTime() : 0;
-    const db = b?.createdAt ? new Date(b.createdAt).getTime() : 0;
-    return db - da;
-  });
+  // Filter notifications based on selected type
+  const getFilteredNotifications = () => {
+    let filtered = [...notifications];
+
+    if (filterType === "daily" && selectedDate) {
+      // Filter by selected date
+      filtered = filtered.filter((n) => {
+        if (!n?.createdAt) return false;
+        const notifDate = new Date(n.createdAt);
+        const selected = new Date(selectedDate);
+        return (
+          notifDate.getFullYear() === selected.getFullYear() &&
+          notifDate.getMonth() === selected.getMonth() &&
+          notifDate.getDate() === selected.getDate()
+        );
+      });
+    } else if (filterType === "weekly" && selectedWeek) {
+      // Filter by selected week (selectedWeek format: "2026-W02")
+      const [year, week] = selectedWeek.split("-W");
+      const weekNum = parseInt(week);
+      
+      filtered = filtered.filter((n) => {
+        if (!n?.createdAt) return false;
+        const notifDate = new Date(n.createdAt);
+        const notifYear = notifDate.getFullYear();
+        const notifWeek = getWeekNumber(notifDate);
+        return notifYear === parseInt(year) && notifWeek === weekNum;
+      });
+    }
+    // For "realtime", return all notifications (no filtering)
+
+    // Sort newest → oldest
+    return filtered.sort((a, b) => {
+      const da = a?.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const db = b?.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return db - da;
+    });
+  };
+
+  // Helper function to get week number
+  const getWeekNumber = (date: Date): number => {
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    const dayNum = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+  };
+
+  const filtered = getFilteredNotifications();
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterType, selectedDate, selectedWeek]);
+
+  // Pagination
+  const totalPages = Math.ceil(filtered.length / NOTIFICATIONS_PER_PAGE);
+  const startIdx = (currentPage - 1) * NOTIFICATIONS_PER_PAGE;
+  const paginatedNotifications = filtered.slice(startIdx, startIdx + NOTIFICATIONS_PER_PAGE);
 
   const handleMarkAsRead = async (notificationId: string) => {
     setLoading(notificationId);
@@ -40,6 +101,12 @@ export default function NotificationLogPage() {
       toast.error(error?.message || "Failed to mark all notifications as read");
     } finally {
       setLoading(null);
+    }
+  };
+
+  const handlePreferenceChange = (patch: Partial<NotificationPreferences>) => {
+    if (preferences) {
+      setPreferences({ ...preferences, ...patch });
     }
   };
 
@@ -72,6 +139,67 @@ export default function NotificationLogPage() {
           </div>
         </div>
 
+        {/* Filter Controls */}
+        <div className="bg-white rounded-xl shadow-sm border p-4 mb-4">
+          <div className="flex items-center gap-4 flex-wrap">
+            {/* Enable AI Alerts Toggle */}
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium text-gray-700">Enable AI Alerts:</label>
+              <input
+                type="checkbox"
+                checked={preferences?.enableAiAlerts ?? true}
+                onChange={(e) => handlePreferenceChange({ enableAiAlerts: e.target.checked })}
+                className="w-4 h-4 text-green-600 rounded focus:ring-2 focus:ring-green-500"
+              />
+            </div>
+
+            {/* Filter Type Selection */}
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium text-gray-700">View:</label>
+              <select
+                value={filterType}
+                onChange={(e) => setFilterType(e.target.value as "realtime" | "daily" | "weekly")}
+                className="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              >
+                <option value="realtime">Real-time (All)</option>
+                <option value="daily">Daily Summary</option>
+                <option value="weekly">Weekly Summary</option>
+              </select>
+            </div>
+
+            {/* Date Picker for Daily */}
+            {filterType === "daily" && (
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium text-gray-700">Date:</label>
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+              </div>
+            )}
+
+            {/* Week Picker for Weekly */}
+            {filterType === "weekly" && (
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium text-gray-700">Week:</label>
+                <input
+                  type="week"
+                  value={selectedWeek}
+                  onChange={(e) => setSelectedWeek(e.target.value)}
+                  className="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+              </div>
+            )}
+
+            {/* Results count */}
+            <div className="text-sm text-gray-500">
+              {filtered.length} notification{filtered.length !== 1 ? "s" : ""} found
+            </div>
+          </div>
+        </div>
+
         {/* Table */}
         <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
           <table className="w-full text-sm">
@@ -89,7 +217,7 @@ export default function NotificationLogPage() {
 
             <tbody>
               {/* Empty state */}
-              {sorted.length === 0 && (
+              {filtered.length === 0 && (
                 <tr>
                   <td
                     colSpan={7}
@@ -101,7 +229,7 @@ export default function NotificationLogPage() {
               )}
 
               {/* Render items */}
-              {sorted.map((n) => {
+              {paginatedNotifications.map((n) => {
                 const p = n?.prediction;
 
                 const notificationKey = n.notificationID ?? n._id;
@@ -144,7 +272,9 @@ export default function NotificationLogPage() {
                   >
                     {/* Type */}
                     <td className="px-4 py-2 text-xs">
-                      {n.type === "ai_alert" ? "AI Alert" : "User Report"}
+                      {n.type === "ai_alert" ? "AI Alert" : 
+                       n.type === "um_special_alert" ? "UM Campus Alert" : 
+                       "User Report"}
                     </td>
 
                     {/* Description */}
@@ -190,6 +320,34 @@ export default function NotificationLogPage() {
             </tbody>
           </table>
         </div>
+
+        {/* Pagination Controls */}
+        {filtered.length > 0 && (
+          <div className="mt-4 flex items-center justify-between text-sm text-gray-600">
+            <div>
+              Showing {startIdx + 1} to {Math.min(startIdx + NOTIFICATIONS_PER_PAGE, filtered.length)} of {filtered.length} notifications
+            </div>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => setCurrentPage(p => p - 1)}
+                disabled={currentPage === 1}
+                className="px-3 py-1 rounded border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Previous
+              </button>
+              <span className="text-xs">
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                onClick={() => setCurrentPage(p => p + 1)}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1 rounded border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </>
   );

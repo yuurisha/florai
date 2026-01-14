@@ -7,7 +7,7 @@ import toast from "react-hot-toast";
 import { auth, db, storage } from "../../../lib/firebaseConfig";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
-import { onAuthStateChanged } from "firebase/auth";
+import { onAuthStateChanged, updateProfile } from "firebase/auth";
 
 import { Button } from "../../../components/button";
 import { Input } from "../../../components/input";
@@ -112,7 +112,10 @@ export default function ProfileForm() {
       setProfilePic(downloadUrl);
       toast.success("Profile picture updated!");
     } catch (err: any) {
-      toast.error(err?.message || "Failed to upload profile picture.");
+      const errorMessage = err?.code === 'not-found' 
+        ? "Profile not found. Please contact support."
+        : "Failed to upload profile picture. Please try again.";
+      toast.error(errorMessage);
     } finally {
       setUploadingPic(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -136,12 +139,22 @@ export default function ProfileForm() {
 
     setLoading(true);
     try {
+      // Update Firestore document
       await updateDoc(doc(db, "users", user.uid), {
         fullName: nameTrim,
       });
+      
+      // Update Firebase Auth displayName
+      await updateProfile(user, {
+        displayName: nameTrim,
+      });
+      
       toast.success("Profile updated successfully!");
     } catch (err: any) {
-      toast.error(err?.message || "Failed to update profile.");
+      const errorMessage = err?.code === 'not-found' 
+        ? "Profile not found. Please contact support."
+        : "Failed to update profile. Please try again.";
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Leaf, Eye, EyeOff } from "lucide-react";
 
-import { createUserWithEmailAndPassword, updateProfile, signOut } from "firebase/auth";
+import { createUserWithEmailAndPassword, updateProfile, signOut, signInWithEmailAndPassword } from "firebase/auth";
 import { auth, db } from "../../lib/firebaseConfig";
 import { doc, setDoc } from "firebase/firestore";
 
@@ -116,10 +116,7 @@ export default function SignUpPage() {
       const userCredential = await createUserWithEmailAndPassword(auth, emailNorm, pwTrim);
       const user = userCredential.user;
 
-      await updateProfile(user, { displayName: nameTrim });
-
-      // ✅ Firestore write uses uid doc id — if called twice, second call would overwrite,
-      // but we prevent double-submit above anyway.
+      // ✅ Create Firestore document FIRST while still authenticated
       await setDoc(doc(db, "users", user.uid), {
         fullName: nameTrim,
         email: emailNorm,
@@ -127,6 +124,10 @@ export default function SignUpPage() {
         createdAt: new Date(),
       });
 
+      // ✅ Update profile
+      await updateProfile(user, { displayName: nameTrim });
+
+      // User stays signed in - redirect to home
       router.push("/home");
     } catch (err: any) {
       const code = err?.code as string | undefined;

@@ -10,10 +10,22 @@ import {
   increment,
   runTransaction,
   serverTimestamp,
+  writeBatch,
 } from "firebase/firestore";
 import { GreenSpace, LatLngPoint } from "@/models/greenSpace";
 
 const greenSpacesRef = collection(db, "greenSpaces");
+const activityLogsRef = collection(db, "activityLogs");
+
+function actorMeta() {
+  const user = auth.currentUser;
+  if (!user) throw new Error("Not authenticated");
+  return {
+    actorUid: user.uid,
+    actorEmail: user.email ?? null,
+    actorName: user.displayName ?? null,
+  };
+}
 
 /* ================= CREATE ================= */
 export const createGreenSpace = async (
@@ -23,7 +35,10 @@ export const createGreenSpace = async (
   const user = auth.currentUser;
   if (!user) throw new Error("Not authenticated");
 
-  await addDoc(greenSpacesRef, {
+  const batch = writeBatch(db);
+  
+  const newGreenSpaceRef = doc(greenSpacesRef);
+  const greenSpaceData = {
     name,
     polygon,
     isActive: true,
@@ -32,7 +47,23 @@ export const createGreenSpace = async (
     totalUploads: 0,
     healthyUploads: 0,
     healthIndex: 0,
+  };
+  
+  batch.set(newGreenSpaceRef, greenSpaceData);
+  
+  // Log creation
+  batch.set(doc(activityLogsRef), {
+    action: "create",
+    entityType: "greenSpace",
+    entityCollection: "greenSpaces",
+    entityId: newGreenSpaceRef.id,
+    entityTitle: name,
+    ...actorMeta(),
+    createdAt: serverTimestamp(),
+    createdAtMs: Date.now(),
   });
+  
+  await batch.commit();
 };
 
 /* ================= FETCH ================= */
@@ -95,10 +126,32 @@ export const deleteGreenSpace = async (greenSpaceId: string) => {
   const user = auth.currentUser;
   if (!user) throw new Error("Not authenticated");
 
+  const batch = writeBatch(db);
+  
   const ref = doc(db, "greenSpaces", greenSpaceId);
-  await updateDoc(ref, {
+  
+  // Get current data for logging
+  const snapshot = await getDocs(query(collection(db, "greenSpaces"), where("__name__", "==", greenSpaceId)));
+  const greenSpaceData = snapshot.docs[0]?.data();
+  
+  batch.update(ref, {
     isActive: false,
   });
+  
+  // Log deletion (soft delete)
+  batch.set(doc(activityLogsRef), {
+    action: "delete",
+    entityType: "greenSpace",
+    entityCollection: "greenSpaces",
+    entityId: greenSpaceId,
+    entityTitle: greenSpaceData?.name ?? null,
+    deletedData: greenSpaceData,
+    ...actorMeta(),
+    createdAt: serverTimestamp(),
+    createdAtMs: Date.now(),
+  });
+  
+  await batch.commit();
 };
 
 export async function updateGreenSpaceHealth(

@@ -18,6 +18,14 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
   const handleLogout = async () => {
     try {
       await signOut(auth); // ✅ Firebase sign-out
+      
+      // Clear all cookies
+      document.cookie = "firebaseToken=; Max-Age=0; path=/; SameSite=Lax";
+      document.cookie = "userRole=; Max-Age=0; path=/; SameSite=Lax";
+      
+      // Clear localStorage
+      localStorage.clear();
+      
       router.push("/login"); // ✅ Redirect user to login page
     } catch (error) {
       console.error("Logout failed:", error);

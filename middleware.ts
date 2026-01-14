@@ -16,13 +16,40 @@ export function middleware(request: NextRequest) {
   const role = request.cookies.get("userRole")?.value || "user";
   const pathname = normalize(request.nextUrl.pathname);
 
-  console.log("🧠 MIDDLEWARE AUTH CHECK", {
+  console.log("MIDDLEWARE AUTH CHECK", {
     path: pathname,
     tokenExists: !!token,
     roleFromCookie: role,
   });
 
-  // 1️⃣ Ignore Next.js internals & static assets
+  // Token validation: check if token exists and is not expired
+  if (token) {
+    try {
+      // Decode JWT token to check expiration (basic validation)
+      const tokenParts = token.split('.');
+      if (tokenParts.length === 3) {
+        const payload = JSON.parse(Buffer.from(tokenParts[1], 'base64').toString());
+        const now = Math.floor(Date.now() / 1000);
+        
+        // If token is expired, clear it and treat as no token
+        if (payload.exp && payload.exp < now) {
+          console.log("Token expired, clearing...");
+          const response = NextResponse.redirect(new URL("/login", request.url));
+          response.cookies.set("firebaseToken", "", { maxAge: 0, path: "/" });
+          response.cookies.set("userRole", "", { maxAge: 0, path: "/" });
+          return response;
+        }
+      }
+    } catch (error) {
+      console.error("Token validation error:", error);
+      // Invalid token format, clear and redirect
+      const response = NextResponse.redirect(new URL("/login", request.url));
+      response.cookies.set("firebaseToken", "", { maxAge: 0, path: "/" });
+      response.cookies.set("userRole", "", { maxAge: 0, path: "/" });
+      return response;
+    }
+  }
+
   if (
     pathname.startsWith("/_next") ||
     pathname.startsWith("/static") ||
@@ -32,23 +59,21 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // 2️⃣ AUTH PAGES (login, signup, forgot password)
   if (AUTH_PAGES.includes(pathname)) {
-    // ❌ logged-in users should NOT see login/signup
+   
     if (token) {
       const redirectTo = role === "admin" ? "/admin" : "/home";
       return NextResponse.redirect(new URL(redirectTo, request.url));
     }
-    // ✅ logged-out users CAN access auth pages
+    
     return NextResponse.next();
   }
 
-  // 3️⃣ NOT LOGGED IN → block all other pages
+  
   if (!token) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  // 4️⃣ ADMIN-ONLY PAGES
   if (
     ADMIN_PATHS.some((p) => pathname.startsWith(p)) &&
     role !== "admin"
@@ -56,7 +81,6 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/unauthorized", request.url));
   }
 
-  // 5️⃣ Everything else
   return NextResponse.next();
 }
 

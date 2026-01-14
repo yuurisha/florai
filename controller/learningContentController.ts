@@ -46,14 +46,50 @@ export function subscribeTips(cb: (tips: Tip[]) => void) {
 }
 
 export async function addTip(input: Omit<TipDoc, "createdAt" | "createdById" | "createdByName">) {
-  await addDoc(tipsRef, { ...input, ...createdByMeta(), createdAt: serverTimestamp() });
+  const batch = writeBatch(db);
+  
+  const newTipRef = doc(tipsRef);
+  const tipData = { ...input, ...createdByMeta(), createdAt: serverTimestamp() };
+  
+  batch.set(newTipRef, tipData);
+  
+  // Log creation
+  batch.set(doc(activityLogsRef), {
+    action: "create",
+    entityType: "learningTip",
+    entityCollection: "learningTips",
+    entityId: newTipRef.id,
+    entityTitle: input.title ?? null,
+    ...actorMeta(),
+    createdAt: serverTimestamp(),
+    createdAtMs: Date.now(),
+  });
+  
+  await batch.commit();
 }
 
 export async function updateTip(
   id: string,
   input: Partial<Omit<TipDoc, "createdAt" | "createdById" | "createdByName">>
 ) {
-  await updateDoc(doc(db, "learningTips", id), { ...input, updatedAt: serverTimestamp() } as any);
+  const batch = writeBatch(db);
+  
+  const tipRef = doc(db, "learningTips", id);
+  batch.update(tipRef, { ...input, updatedAt: serverTimestamp() } as any);
+  
+  // Log update
+  batch.set(doc(activityLogsRef), {
+    action: "update",
+    entityType: "learningTip",
+    entityCollection: "learningTips",
+    entityId: id,
+    entityTitle: input.title ?? null,
+    ...actorMeta(),
+    createdAt: serverTimestamp(),
+    createdAtMs: Date.now(),
+  });
+  
+  await batch.commit();
 }
 
 
@@ -95,14 +131,50 @@ export function subscribeResources(cb: (resources: Resource[]) => void) {
 export async function addResource(
   input: Omit<ResourceDoc, "createdAt" | "createdById" | "createdByName">
 ) {
-  await addDoc(resourcesRef, { ...input, ...createdByMeta(), createdAt: serverTimestamp() });
+  const batch = writeBatch(db);
+  
+  const newResourceRef = doc(resourcesRef);
+  const resourceData = { ...input, ...createdByMeta(), createdAt: serverTimestamp() };
+  
+  batch.set(newResourceRef, resourceData);
+  
+  // Log creation
+  batch.set(doc(activityLogsRef), {
+    action: "create",
+    entityType: "learningResource",
+    entityCollection: "learningResources",
+    entityId: newResourceRef.id,
+    entityTitle: input.title ?? null,
+    ...actorMeta(),
+    createdAt: serverTimestamp(),
+    createdAtMs: Date.now(),
+  });
+  
+  await batch.commit();
 }
 
 export async function updateResource(
   id: string,
   input: Partial<Omit<ResourceDoc, "createdAt" | "createdById" | "createdByName">>
 ) {
-  await updateDoc(doc(db, "learningResources", id), { ...input, updatedAt: serverTimestamp() } as any);
+  const batch = writeBatch(db);
+  
+  const resourceRef = doc(db, "learningResources", id);
+  batch.update(resourceRef, { ...input, updatedAt: serverTimestamp() } as any);
+  
+  // Log update
+  batch.set(doc(activityLogsRef), {
+    action: "update",
+    entityType: "learningResource",
+    entityCollection: "learningResources",
+    entityId: id,
+    entityTitle: input.title ?? null,
+    ...actorMeta(),
+    createdAt: serverTimestamp(),
+    createdAtMs: Date.now(),
+  });
+  
+  await batch.commit();
 }
 
   // Deletes resources + logs activity atomically (same commit).
