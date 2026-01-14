@@ -24,9 +24,16 @@ type MapBaseProps = {
   onZoneSelect?: (zone: GreenSpace | null) => void;
   refreshKey?: number;
   mapId?: string;
+  healthWindowDays?: 5 | 30;
 };
 
-export default function MapBase({ mode, onZoneSelect, refreshKey, mapId }: MapBaseProps) {
+export default function MapBase({
+  mode,
+  onZoneSelect,
+  refreshKey,
+  mapId,
+  healthWindowDays = 30,
+}: MapBaseProps) {
   const mapElementId = mapId ?? "map";
   const [mapReady, setMapReady] = useState(false);
   const [zones, setZones] = useState<HibiscusZone[]>([]);
@@ -49,6 +56,49 @@ export default function MapBase({ mode, onZoneSelect, refreshKey, mapId }: MapBa
   } | null>(null);
 
   const zonesRef = useRef<HibiscusZone[]>([]);
+
+  const getRollingWindowLabel = (days: number) => {
+    const end = new Date();
+    const start = new Date(end.getTime() - days * 24 * 60 * 60 * 1000);
+    const startMonth = start.toLocaleString("en-US", { month: "short" });
+    const endMonth = end.toLocaleString("en-US", { month: "short" });
+    const range = startMonth === endMonth ? startMonth : `${startMonth}-${endMonth}`;
+    return `Last ${days} days (${range})`;
+  };
+
+  const getWindowStats = (z: HibiscusZone) => {
+    if (healthWindowDays === 5) {
+      return {
+        total: z.totalUploads5 ?? 0,
+        healthIndex: z.healthIndex5 ?? null,
+      };
+    }
+    return {
+      total: z.totalUploads ?? 0,
+      healthIndex: z.healthIndex ?? null,
+    };
+  };
+
+  const buildLegendHtml = (rollingWindowLabel: string) => {
+    const row = (color: string, label: string) => `
+      <div style="display:flex;align-items:center;gap:8px;margin-top:6px;">
+        <span style="width:12px;height:12px;background:${color};display:inline-block;border-radius:3px;border:1px solid rgba(0,0,0,0.15)"></span>
+        <span>${label}</span>
+      </div>
+    `;
+
+    return `
+      <div style="font-weight:700;margin-bottom:4px;">Plant Health</div>
+      ${row("#2ECC71", "Healthy")}
+      ${row("#F1C40F", "Moderate")}
+      ${row("#E74C3C", "Sick")}
+      ${row("#BDC3C7", "Pending / Insufficient data")}
+      ${row("#95A5A6", "No data")}
+      <div style="margin-top:8px;color:#6b7280;">
+        Based on ${rollingWindowLabel}
+      </div>
+    `;
+  };
 
   useEffect(() => {
     zonesRef.current = zones;
@@ -168,28 +218,12 @@ const legend = (L as any).control({ position: "topright" });
         div.style.fontSize = "12px";
         div.style.lineHeight = "1.4";
         div.style.minWidth = "140px";
-
-        const row = (color: string, label: string) => `
-          <div style="display:flex;align-items:center;gap:8px;margin-top:6px;">
-            <span style="width:12px;height:12px;background:${color};display:inline-block;border-radius:3px;border:1px solid rgba(0,0,0,0.15)"></span>
-            <span>${label}</span>
-          </div>
-        `;
-
-        div.innerHTML = `
-          <div style="font-weight:700;margin-bottom:4px;">Plant Health</div>
-          ${row("#2ECC71", "Healthy")}
-          ${row("#F1C40F", "Moderate")}
-          ${row("#E74C3C", "Sick")}
-          ${row("#95A5A6", "No data")}
-          <div style="margin-top:8px;color:#6b7280;">
-            Based on zone health index
-          </div>
-        `;
+        div.innerHTML = buildLegendHtml(getRollingWindowLabel(healthWindowDays));
         return div;
       };
 
       legend.addTo(map);
+      container.__legend__ = legend;
 
       const legendEl = (legend as any).getContainer?.();
       if (legendEl) {
@@ -289,6 +323,15 @@ const legend = (L as any).control({ position: "topright" });
       });
   }, [mapReady, refreshKey]);
 
+  useEffect(() => {
+    if (!mapReady) return;
+    const container = document.getElementById(mapElementId) as any;
+    const legend = container?.__legend__;
+    const legendEl = legend?.getContainer?.();
+    if (!legendEl) return;
+    legendEl.innerHTML = buildLegendHtml(getRollingWindowLabel(healthWindowDays));
+  }, [mapReady, mapElementId, healthWindowDays]);
+
   /* ================= RENDER ZONES ================= */
   useEffect(() => {
     if (!mapReady) return;
@@ -304,20 +347,24 @@ const legend = (L as any).control({ position: "topright" });
     if (container.__zones_layer__) map.removeLayer(container.__zones_layer__);
     const markersGroup = L.layerGroup();
 
+    const rollingWindowLabel = getRollingWindowLabel(healthWindowDays);
+
     /* ===== STEP 6: COLOR LOGIC ===== */
     const getZoneColor = (z: HibiscusZone) => {
-      const total = z.totalUploads ?? 0;
+      const { total, healthIndex } = getWindowStats(z);
       if (total === 0) return "#95A5A6";
-      if ((z.healthIndex ?? 0) >= 0.8) return "#2ECC71";
-      if ((z.healthIndex ?? 0) >= 0.6) return "#F1C40F";
+      if (total < 5 || healthIndex === null) return "#BDC3C7";
+      if (healthIndex >= 0.8) return "#2ECC71";
+      if (healthIndex >= 0.6) return "#F1C40F";
       return "#E74C3C";
     };
 
     const getHealthLabel = (z: HibiscusZone) => {
-      const total = z.totalUploads ?? 0;
+      const { total, healthIndex } = getWindowStats(z);
       if (total === 0) return "No data yet";
-      if ((z.healthIndex ?? 0) >= 0.8) return "Healthy";
-      if ((z.healthIndex ?? 0) >= 0.6) return "Moderate";
+      if (total < 5 || healthIndex === null) return "Pending / Insufficient data";
+      if (healthIndex >= 0.8) return "Healthy";
+      if (healthIndex >= 0.6) return "Moderate";
       return "Unhealthy";
     };
 
@@ -357,7 +404,7 @@ const legend = (L as any).control({ position: "topright" });
       );
 
       poly.on("click", () => {
-        const total = z.totalUploads ?? 0;
+        const { total } = getWindowStats(z);
         const healthText = getHealthLabel(z);
         const displayName = z.name.replace(/\s*\(\d{1,2}\/\d{1,2}\/\d{4}\)\s*$/, "");
 
@@ -383,12 +430,12 @@ const legend = (L as any).control({ position: "topright" });
         nameEl.style.marginBottom = "4px";
 
         const healthEl = L.DomUtil.create("div", "", infoCol);
-        healthEl.textContent = `Health level: ${healthText}`;
+        healthEl.textContent = `Health level (${rollingWindowLabel}): ${healthText}`;
         healthEl.style.fontSize = "13px";
         healthEl.style.marginBottom = "2px";
 
         const totalEl = L.DomUtil.create("div", "", infoCol);
-        totalEl.textContent = `Total Uploads: ${total}`;
+        totalEl.textContent = `Uploads (${rollingWindowLabel}): ${total}`;
         totalEl.style.fontSize = "13px";
 
         const photoWrap = L.DomUtil.create("div", "", topRow);
@@ -452,7 +499,7 @@ const legend = (L as any).control({ position: "topright" });
 
     markersGroup.addTo(map);
     container.__zones_layer__ = markersGroup;
-  }, [zones, mode, mapReady, mapElementId]);
+  }, [zones, mode, mapReady, mapElementId, healthWindowDays]);
 
   /* ================= UI ================= */
   return (

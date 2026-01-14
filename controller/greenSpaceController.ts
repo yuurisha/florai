@@ -7,14 +7,15 @@ import {
   where,
   updateDoc,
   doc,
-  runTransaction,
   serverTimestamp,
   getDoc,
+  Timestamp,
 } from "firebase/firestore";
 import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { GreenSpace, LatLngPoint } from "@/models/greenSpace";
 
 const greenSpacesRef = collection(db, "greenSpaces");
+const uploadsRef = collection(db, "uploads");
 const activityLogsRef = collection(db, "activityLogs");
 
 function actorMeta() {
@@ -44,7 +45,11 @@ export const createGreenSpace = async (
     totalUploads: 0,
     healthyUploads: 0,
     diseasedUploads: 0,
-    healthIndex: 0,
+    healthIndex: null,
+    totalUploads5: 0,
+    healthyUploads5: 0,
+    diseasedUploads5: 0,
+    healthIndex5: null,
     photoUrl: null,
   });
 
@@ -119,32 +124,58 @@ export const removeGreenSpacePhoto = async (greenSpaceId: string) => {
   await updateGreenSpaceMeta(greenSpaceId, { photoUrl: null });
 };
 
-export async function updateGreenSpaceHealth(
-  greenSpaceId: string,
-  observationStatus: "Healthy" | "Diseased"
-) {
+export async function updateGreenSpaceHealth(greenSpaceId: string) {
   const ref = doc(db, "greenSpaces", greenSpaceId);
+  const now = new Date();
+  const start30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  const start5 = new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000);
+  const start30Ts = Timestamp.fromDate(start30);
 
-  await runTransaction(db, async (transaction) => {
-    const snap = await transaction.get(ref);
-    if (!snap.exists()) throw new Error("Green space not found");
+  const recentSnap = await getDocs(
+    query(
+      uploadsRef,
+      where("greenSpaceId", "==", greenSpaceId),
+      where("createdAt", ">=", start30Ts)
+    )
+  );
 
-    const data = snap.data();
+  let healthyUploads = 0;
+  let diseasedUploads = 0;
+  let healthyUploads5 = 0;
+  let diseasedUploads5 = 0;
 
-    const totalUploads = (data.totalUploads ?? 0) + 1;
-    const healthyUploads =
-      (data.healthyUploads ?? 0) + (observationStatus === "Healthy" ? 1 : 0);
-    const diseasedUploads =
-      (data.diseasedUploads ?? 0) + (observationStatus === "Diseased" ? 1 : 0);
+  recentSnap.docs.forEach((docSnap) => {
+    const data = docSnap.data() as any;
+    const status = data?.observationStatus;
+    if (status !== "Healthy" && status !== "Diseased") return;
 
-    const healthIndex = healthyUploads / totalUploads;
+    const createdAt = data?.createdAt;
+    const createdAtDate =
+      createdAt && typeof createdAt.toDate === "function" ? createdAt.toDate() : null;
 
-    transaction.update(ref, {
-      totalUploads,
-      healthyUploads,
-      diseasedUploads,
-      healthIndex,
-      updatedAt: new Date(),
-    });
+    if (status === "Healthy") healthyUploads += 1;
+    else if (status === "Diseased") diseasedUploads += 1;
+
+    if (createdAtDate && createdAtDate >= start5) {
+      if (status === "Healthy") healthyUploads5 += 1;
+      else if (status === "Diseased") diseasedUploads5 += 1;
+    }
+  });
+
+  const totalUploads = healthyUploads + diseasedUploads;
+  const healthIndex = totalUploads >= 5 ? healthyUploads / totalUploads : null;
+  const totalUploads5 = healthyUploads5 + diseasedUploads5;
+  const healthIndex5 = totalUploads5 >= 5 ? healthyUploads5 / totalUploads5 : null;
+
+  await updateDoc(ref, {
+    totalUploads,
+    healthyUploads,
+    diseasedUploads,
+    healthIndex,
+    totalUploads5,
+    healthyUploads5,
+    diseasedUploads5,
+    healthIndex5,
+    updatedAt: serverTimestamp(),
   });
 }

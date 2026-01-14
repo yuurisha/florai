@@ -79,7 +79,7 @@ export const uploadLeafPhotoAndPredict = async (file: File, greenSpaceId: string
 
     console.log("3) updating green space health...");
     if (observationStatus === "Healthy" || observationStatus === "Diseased") {
-      await updateGreenSpaceHealth(greenSpaceId, observationStatus);
+      await updateGreenSpaceHealth(greenSpaceId);
     }
 
     console.log("DONE ✅");

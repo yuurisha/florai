@@ -45,19 +45,47 @@ export default function Page() {
   const [tableRows, setTableRows] = useState<
     { zone: GreenSpace; latestUpload: string | null }[]
   >([]);
+  const [healthWindowDays, setHealthWindowDays] = useState<5 | 30>(30);
+
+  const getRollingWindowLabel = (days: number) => {
+    const end = new Date();
+    const start = new Date(end.getTime() - days * 24 * 60 * 60 * 1000);
+    const startMonth = start.toLocaleString("en-US", { month: "short" });
+    const endMonth = end.toLocaleString("en-US", { month: "short" });
+    const range = startMonth === endMonth ? startMonth : `${startMonth}-${endMonth}`;
+    return `Last ${days} days (${range})`;
+  };
+
+  const getWindowStats = (zone: GreenSpace) => {
+    if (healthWindowDays === 5) {
+      return {
+        total: zone.totalUploads5 ?? 0,
+        healthy: zone.healthyUploads5 ?? 0,
+        healthIndex: zone.healthIndex5 ?? null,
+      };
+    }
+    return {
+      total: zone.totalUploads ?? 0,
+      healthy: zone.healthyUploads ?? 0,
+      healthIndex: zone.healthIndex ?? null,
+    };
+  };
 
   const getHealthLabel = (zone: GreenSpace) => {
-    const total = zone.totalUploads ?? 0;
+    const { total, healthIndex } = getWindowStats(zone);
     if (total === 0) return "No data";
-    if ((zone.healthIndex ?? 0) >= 0.8) return "Healthy";
-    if ((zone.healthIndex ?? 0) >= 0.6) return "Moderate";
+    if (total < 5 || healthIndex === null) return "Pending / Insufficient data";
+    if (healthIndex >= 0.8) return "Healthy";
+    if (healthIndex >= 0.6) return "Moderate";
     return "Unhealthy";
   };
 
   const getHealthPercent = (zone: GreenSpace) => {
-    const total = zone.totalUploads ?? 0;
+    const { total, healthIndex } = getWindowStats(zone);
     if (total === 0) return "--";
-    return `${Math.round((zone.healthIndex ?? 0) * 100)}%`;
+    if (total < 5) return "--";
+    if (healthIndex === null) return "--";
+    return `${Math.round(healthIndex * 100)}%`;
   };
 
   const formatUploadDate = (value: any) => {
@@ -110,19 +138,19 @@ export default function Page() {
   const exportTableToCSV = () => {
     if (tableRows.length === 0) return;
 
+    const rollingWindowLabel = getRollingWindowLabel(healthWindowDays);
     const rows = [
       [
         "Name",
-        "Health level",
+        `Health level (${rollingWindowLabel})`,
         "Health %",
-        "Total leaves",
+        `Observations (${rollingWindowLabel})`,
         "Healthy leaves",
         "Diseased leaves",
         "Latest photo upload",
       ],
       ...tableRows.map(({ zone, latestUpload }) => {
-        const total = zone.totalUploads ?? 0;
-        const healthy = zone.healthyUploads ?? 0;
+        const { total, healthy } = getWindowStats(zone);
         const diseased = Math.max(total - healthy, 0);
         return [
           zone.name,
@@ -297,13 +325,43 @@ export default function Page() {
       <div className="relative z-0 flex h-[calc(100vh-4rem)] flex-col bg-slate-50 xl:flex-row">
         <div className="relative flex-1 p-4 space-y-4">
           <div className="h-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <div className="h-full w-full">
-              <MapClient
-                mode="admin"
-                onZoneSelect={(zone) => setSelectedZone(zone)}
-                refreshKey={refreshKey}
-                mapId="admin-map"
-              />
+            <div className="flex h-full flex-col">
+              <div className="flex items-center justify-between gap-2 border-b border-slate-200 px-4 py-2 text-xs">
+                <span className="font-semibold text-slate-600">Health window</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setHealthWindowDays(30)}
+                    className={`rounded-full border px-3 py-1 font-semibold ${
+                      healthWindowDays === 30
+                        ? "border-emerald-600 bg-emerald-50 text-emerald-700"
+                        : "border-slate-300 text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    30 days
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setHealthWindowDays(5)}
+                    className={`rounded-full border px-3 py-1 font-semibold ${
+                      healthWindowDays === 5
+                        ? "border-emerald-600 bg-emerald-50 text-emerald-700"
+                        : "border-slate-300 text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    5 days
+                  </button>
+                </div>
+              </div>
+              <div className="flex-1">
+                <MapClient
+                  mode="admin"
+                  onZoneSelect={(zone) => setSelectedZone(zone)}
+                  refreshKey={refreshKey}
+                  mapId="admin-map"
+                  healthWindowDays={healthWindowDays}
+                />
+              </div>
             </div>
           </div>
 
@@ -358,9 +416,13 @@ export default function Page() {
                       <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
                         <tr>
                           <th className="px-3 py-2">Name</th>
-                          <th className="px-3 py-2">Health level</th>
-                          <th className="px-3 py-2">Health %</th>
-                          <th className="px-3 py-2">Total leaves</th>
+                        <th className="px-3 py-2">
+                          Health level ({getRollingWindowLabel(healthWindowDays)})
+                        </th>
+                        <th className="px-3 py-2">Health %</th>
+                        <th className="px-3 py-2">
+                          Observations ({getRollingWindowLabel(healthWindowDays)})
+                        </th>
                           <th className="px-3 py-2">Healthy leaves</th>
                           <th className="px-3 py-2">Diseased leaves</th>
                           <th className="px-3 py-2">Latest photo upload</th>
@@ -368,8 +430,7 @@ export default function Page() {
                       </thead>
                       <tbody className="divide-y divide-slate-200">
                         {tableRows.map(({ zone, latestUpload }) => {
-                          const total = zone.totalUploads ?? 0;
-                          const healthy = zone.healthyUploads ?? 0;
+                          const { total, healthy } = getWindowStats(zone);
                           const diseased = Math.max(total - healthy, 0);
                           const healthLabel = getHealthLabel(zone);
                           const healthClass =
@@ -473,7 +534,8 @@ export default function Page() {
                         {selectedZone.name}
                       </p>
                       <p className="text-xs text-slate-500">
-                        Total uploads: {selectedZone.totalUploads ?? 0}
+                        Uploads ({getRollingWindowLabel(healthWindowDays)}):{" "}
+                        {getWindowStats(selectedZone).total}
                       </p>
                     </div>
                   </div>

@@ -96,19 +96,47 @@ const MapViewer = dynamic(() => import("../../components/MapViewer"), { ssr: fal
   const [greenSpaces, setGreenSpaces] = useState<GreenSpace[]>([]);
   const [greenSpacesLoading, setGreenSpacesLoading] = useState(true);
   const [greenSpacesError, setGreenSpacesError] = useState<string | null>(null);
+  const [healthWindowDays, setHealthWindowDays] = useState<5 | 30>(30);
+
+  const getRollingWindowLabel = (days: number) => {
+    const end = new Date();
+    const start = new Date(end.getTime() - days * 24 * 60 * 60 * 1000);
+    const startMonth = start.toLocaleString("en-US", { month: "short" });
+    const endMonth = end.toLocaleString("en-US", { month: "short" });
+    const range = startMonth === endMonth ? startMonth : `${startMonth}-${endMonth}`;
+    return `Last ${days} days (${range})`;
+  };
+
+  const getWindowStats = (zone: GreenSpace) => {
+    if (healthWindowDays === 5) {
+      return {
+        total: zone.totalUploads5 ?? 0,
+        healthy: zone.healthyUploads5 ?? 0,
+        healthIndex: zone.healthIndex5 ?? null,
+      };
+    }
+    return {
+      total: zone.totalUploads ?? 0,
+      healthy: zone.healthyUploads ?? 0,
+      healthIndex: zone.healthIndex ?? null,
+    };
+  };
 
   const getHealthLabel = (zone: GreenSpace) => {
-    const total = zone.totalUploads ?? 0;
+    const { total, healthIndex } = getWindowStats(zone);
     if (total === 0) return "No data";
-    if ((zone.healthIndex ?? 0) >= 0.8) return "Healthy";
-    if ((zone.healthIndex ?? 0) >= 0.6) return "Moderate";
+    if (total < 5 || healthIndex === null) return "Pending / Insufficient data";
+    if (healthIndex >= 0.8) return "Healthy";
+    if (healthIndex >= 0.6) return "Moderate";
     return "Unhealthy";
   };
 
   const getHealthPercent = (zone: GreenSpace) => {
-    const total = zone.totalUploads ?? 0;
+    const { total, healthIndex } = getWindowStats(zone);
     if (total === 0) return "--";
-    return `${Math.round((zone.healthIndex ?? 0) * 100)}%`;
+    if (total < 5) return "--";
+    if (healthIndex === null) return "--";
+    return `${Math.round(healthIndex * 100)}%`;
   };
 
   const greenSpaceSummary = greenSpaces.reduce(
@@ -246,18 +274,18 @@ const exportToCSV = () => {
   const exportGreenSpacesToCSV = () => {
     if (greenSpaces.length === 0) return;
 
+    const rollingWindowLabel = getRollingWindowLabel(healthWindowDays);
     const rows = [
       [
         "Name",
-        "Health level",
+        `Health level (${rollingWindowLabel})`,
         "Health %",
-        "Total leaves",
+        `Observations (${rollingWindowLabel})`,
         "Healthy leaves",
         "Diseased leaves",
       ],
       ...greenSpaces.map((zone) => {
-        const total = zone.totalUploads ?? 0;
-        const healthy = zone.healthyUploads ?? 0;
+        const { total, healthy } = getWindowStats(zone);
         const diseased = Math.max(total - healthy, 0);
         return [
           zone.name,
@@ -459,19 +487,48 @@ const exportToCSV = () => {
                         Select a hibiscus zone on the map, then upload a plant image for analysis.
                       </CardDescription>
                     </div>
-                    <button
-                      type="button"
-                      onClick={exportMapImage}
-                      className="inline-flex items-center gap-2 rounded border border-green-600 px-3 py-2 text-xs font-semibold text-green-700 hover:bg-green-50"
-                    >
-                      Export Map
-                    </button>
+                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                      <span className="font-semibold text-slate-600">Health window</span>
+                      <button
+                        type="button"
+                        onClick={() => setHealthWindowDays(30)}
+                        className={`rounded-full border px-3 py-1 font-semibold ${
+                          healthWindowDays === 30
+                            ? "border-emerald-600 bg-emerald-50 text-emerald-700"
+                            : "border-slate-300 text-slate-600 hover:bg-slate-50"
+                        }`}
+                      >
+                        30 days
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setHealthWindowDays(5)}
+                        className={`rounded-full border px-3 py-1 font-semibold ${
+                          healthWindowDays === 5
+                            ? "border-emerald-600 bg-emerald-50 text-emerald-700"
+                            : "border-slate-300 text-slate-600 hover:bg-slate-50"
+                        }`}
+                      >
+                        5 days
+                      </button>
+                      <button
+                        type="button"
+                        onClick={exportMapImage}
+                        className="inline-flex items-center gap-2 rounded border border-green-600 px-3 py-2 text-xs font-semibold text-green-700 hover:bg-green-50"
+                      >
+                        Export Map
+                      </button>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent className="p-0">
                   {/* Reuse the same map page logic here */}
                   <div className="h-[70vh] w-full">
-                    <MapClient mode="user" mapId="user-map" />
+                    <MapClient
+                      mode="user"
+                      mapId="user-map"
+                      healthWindowDays={healthWindowDays}
+                    />
                   </div>
                 </CardContent>
               </Card>
@@ -482,7 +539,8 @@ const exportToCSV = () => {
                     <div>
                       <CardTitle>Green spaces</CardTitle>
                       <CardDescription>
-                        All active zones with health status and uploads.
+                        All active zones with health status from{" "}
+                        {getRollingWindowLabel(healthWindowDays)}.
                       </CardDescription>
                     </div>
                     <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600">
@@ -530,17 +588,20 @@ const exportToCSV = () => {
                         <thead className="bg-gray-50 text-xs uppercase text-gray-500">
                           <tr>
                             <th className="px-3 py-2">Name</th>
-                            <th className="px-3 py-2">Health level</th>
+                            <th className="px-3 py-2">
+                              Health level ({getRollingWindowLabel(healthWindowDays)})
+                            </th>
                             <th className="px-3 py-2">Health %</th>
-                            <th className="px-3 py-2">Total leaves</th>
+                            <th className="px-3 py-2">
+                              Observations ({getRollingWindowLabel(healthWindowDays)})
+                            </th>
                             <th className="px-3 py-2">Healthy leaves</th>
                             <th className="px-3 py-2">Diseased leaves</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
                           {greenSpaces.map((zone) => {
-                            const total = zone.totalUploads ?? 0;
-                            const healthy = zone.healthyUploads ?? 0;
+                            const { total, healthy } = getWindowStats(zone);
                             const diseased = Math.max(total - healthy, 0);
                             const healthLabel = getHealthLabel(zone);
                             const healthClass =

@@ -10,15 +10,23 @@ type MapClientProps = {
   onZoneSelect?: (zone: GreenSpace | null) => void;
   refreshKey?: number;
   mapId?: string;
+  healthWindowDays?: 5 | 30;
 };
 
-export default function MapClient({ mode, onZoneSelect, refreshKey, mapId }: MapClientProps) {
+export default function MapClient({
+  mode,
+  onZoneSelect,
+  refreshKey,
+  mapId,
+  healthWindowDays,
+}: MapClientProps) {
   return (
     <MapBase
       mode={mode}
       onZoneSelect={onZoneSelect}
       refreshKey={refreshKey}
       mapId={mapId}
+      healthWindowDays={healthWindowDays}
     />
   );
 }
