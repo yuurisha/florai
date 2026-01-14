@@ -57,14 +57,7 @@ export default function MapBase({
 
   const zonesRef = useRef<HibiscusZone[]>([]);
 
-  const getRollingWindowLabel = (days: number) => {
-    const end = new Date();
-    const start = new Date(end.getTime() - days * 24 * 60 * 60 * 1000);
-    const startMonth = start.toLocaleString("en-US", { month: "short" });
-    const endMonth = end.toLocaleString("en-US", { month: "short" });
-    const range = startMonth === endMonth ? startMonth : `${startMonth}-${endMonth}`;
-    return `Last ${days} days (${range})`;
-  };
+  const getRollingWindowLabel = (days: number) => `Last ${days} days`;
 
   const getWindowStats = (z: HibiscusZone) => {
     if (healthWindowDays === 5) {

@@ -47,14 +47,7 @@ export default function Page() {
   >([]);
   const [healthWindowDays, setHealthWindowDays] = useState<5 | 30>(30);
 
-  const getRollingWindowLabel = (days: number) => {
-    const end = new Date();
-    const start = new Date(end.getTime() - days * 24 * 60 * 60 * 1000);
-    const startMonth = start.toLocaleString("en-US", { month: "short" });
-    const endMonth = end.toLocaleString("en-US", { month: "short" });
-    const range = startMonth === endMonth ? startMonth : `${startMonth}-${endMonth}`;
-    return `Last ${days} days (${range})`;
-  };
+  const getRollingWindowLabel = (days: number) => `Last ${days} days`;
 
   const getWindowStats = (zone: GreenSpace) => {
     if (healthWindowDays === 5) {
