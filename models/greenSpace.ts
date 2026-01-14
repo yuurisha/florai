@@ -18,6 +18,14 @@ export interface GreenSpace {
   healthyUploads5?: number;
   diseasedUploads5?: number;
   healthIndex5?: number | null;
+  totalLeaves?: number;
+  healthyLeaves?: number;
+  diseasedLeaves?: number;
+  leafHealthIndex?: number | null;
+  totalLeaves5?: number;
+  healthyLeaves5?: number;
+  diseasedLeaves5?: number;
+  leafHealthIndex5?: number | null;
 
   lastPrediction?: string;
   lastConfidence?: number;

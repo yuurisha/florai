@@ -9,6 +9,7 @@ import { GreenSpace } from "@/models/greenSpace";
 import {
   createGreenSpace,
   fetchGreenSpaces,
+  updateGreenSpaceHealth,
 } from "@/controller/greenSpaceController";
 import { uploadLeafPhotoAndPredict } from "@/controller/uploadController";
 import toast from "react-hot-toast";
@@ -315,6 +316,29 @@ const legend = (L as any).control({ position: "topright" });
         toast.error("Failed to load green spaces. Please refresh.");
       });
   }, [mapReady, refreshKey]);
+
+  useEffect(() => {
+    if (!mapReady || healthWindowDays !== 5) return;
+    const missing = zones.filter(
+      (z) => z.totalUploads5 == null || z.healthIndex5 === undefined
+    );
+    if (missing.length === 0) return;
+
+    let active = true;
+    (async () => {
+      try {
+        await Promise.all(missing.map((z) => updateGreenSpaceHealth(z.id)));
+        const refreshed = await fetchGreenSpaces();
+        if (active) setZones(refreshed);
+      } catch (err) {
+        console.error("Failed to backfill 5-day health stats:", err);
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [mapReady, healthWindowDays, zones]);
 
   useEffect(() => {
     if (!mapReady) return;

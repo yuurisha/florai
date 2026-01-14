@@ -74,6 +74,9 @@ export const uploadLeafPhotoAndPredict = async (file: File, greenSpaceId: string
       //confidence,
       status,
       observationStatus,
+      summaryHealthy: summary.healthy,
+      summaryDiseased: summary.diseased,
+      summaryTotal: summary.total,
       createdAt: serverTimestamp(),
     });
 

@@ -50,6 +50,14 @@ export const createGreenSpace = async (
     healthyUploads5: 0,
     diseasedUploads5: 0,
     healthIndex5: null,
+    totalLeaves: 0,
+    healthyLeaves: 0,
+    diseasedLeaves: 0,
+    leafHealthIndex: null,
+    totalLeaves5: 0,
+    healthyLeaves5: 0,
+    diseasedLeaves5: 0,
+    leafHealthIndex5: null,
     photoUrl: null,
   });
 
@@ -143,6 +151,10 @@ export async function updateGreenSpaceHealth(greenSpaceId: string) {
   let diseasedUploads = 0;
   let healthyUploads5 = 0;
   let diseasedUploads5 = 0;
+  let healthyLeaves = 0;
+  let diseasedLeaves = 0;
+  let healthyLeaves5 = 0;
+  let diseasedLeaves5 = 0;
 
   recentSnap.docs.forEach((docSnap) => {
     const data = docSnap.data() as any;
@@ -153,12 +165,28 @@ export async function updateGreenSpaceHealth(greenSpaceId: string) {
     const createdAtDate =
       createdAt && typeof createdAt.toDate === "function" ? createdAt.toDate() : null;
 
+    const hasSummaryFields =
+      data?.summaryHealthy != null || data?.summaryDiseased != null || data?.summaryTotal != null;
+    let summaryHealthy = Number(data?.summaryHealthy ?? 0);
+    let summaryDiseased = Number(data?.summaryDiseased ?? 0);
+
+    if (!hasSummaryFields && (status === "Healthy" || status === "Diseased")) {
+      summaryHealthy = status === "Healthy" ? 1 : 0;
+      summaryDiseased = status === "Diseased" ? 1 : 0;
+    }
+
     if (status === "Healthy") healthyUploads += 1;
     else if (status === "Diseased") diseasedUploads += 1;
+
+    healthyLeaves += summaryHealthy;
+    diseasedLeaves += summaryDiseased;
 
     if (createdAtDate && createdAtDate >= start5) {
       if (status === "Healthy") healthyUploads5 += 1;
       else if (status === "Diseased") diseasedUploads5 += 1;
+
+      healthyLeaves5 += summaryHealthy;
+      diseasedLeaves5 += summaryDiseased;
     }
   });
 
@@ -166,6 +194,10 @@ export async function updateGreenSpaceHealth(greenSpaceId: string) {
   const healthIndex = totalUploads >= 5 ? healthyUploads / totalUploads : null;
   const totalUploads5 = healthyUploads5 + diseasedUploads5;
   const healthIndex5 = totalUploads5 >= 5 ? healthyUploads5 / totalUploads5 : null;
+  const totalLeaves = healthyLeaves + diseasedLeaves;
+  const leafHealthIndex = totalLeaves >= 5 ? healthyLeaves / totalLeaves : null;
+  const totalLeaves5 = healthyLeaves5 + diseasedLeaves5;
+  const leafHealthIndex5 = totalLeaves5 >= 5 ? healthyLeaves5 / totalLeaves5 : null;
 
   await updateDoc(ref, {
     totalUploads,
@@ -176,6 +208,14 @@ export async function updateGreenSpaceHealth(greenSpaceId: string) {
     healthyUploads5,
     diseasedUploads5,
     healthIndex5,
+    totalLeaves,
+    healthyLeaves,
+    diseasedLeaves,
+    leafHealthIndex,
+    totalLeaves5,
+    healthyLeaves5,
+    diseasedLeaves5,
+    leafHealthIndex5,
     updatedAt: serverTimestamp(),
   });
 }

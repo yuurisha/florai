@@ -7,6 +7,7 @@ import { GreenSpace } from "@/models/greenSpace";
 import toast from "react-hot-toast";
 import {
   deleteGreenSpace,
+  updateGreenSpaceHealth,
   removeGreenSpacePhoto,
   updateGreenSpaceMeta,
   uploadGreenSpacePhoto,
@@ -197,6 +198,36 @@ export default function Page() {
     if (!showTable) return;
     refreshTable();
   }, [showTable, refreshKey]);
+
+  useEffect(() => {
+    if (healthWindowDays !== 5) return;
+    let active = true;
+
+    (async () => {
+      try {
+        const zones = await fetchGreenSpaces();
+        const missing = zones.filter(
+          (zone) => zone.totalUploads5 == null || zone.healthIndex5 === undefined
+        );
+        if (missing.length === 0) return;
+        await Promise.all(missing.map((zone) => updateGreenSpaceHealth(zone.id)));
+        const refreshed = await fetchGreenSpaces();
+        if (!active) return;
+        if (selectedZone) {
+          const updated = refreshed.find((zone) => zone.id === selectedZone.id);
+          if (updated) setSelectedZone(updated);
+        }
+        setRefreshKey((v) => v + 1);
+        if (showTable) await refreshTable();
+      } catch (err) {
+        console.error("Failed to backfill 5-day health stats:", err);
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [healthWindowDays, selectedZone, showTable]);
 
   useEffect(() => {
     let cancelled = false;

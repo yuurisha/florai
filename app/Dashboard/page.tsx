@@ -29,7 +29,7 @@ import dynamic from "next/dynamic";
 import TopNavBar from "../../components/TopNavBar";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "../../lib/firebaseConfig";
-import { fetchGreenSpaces } from "@/controller/greenSpaceController";
+import { fetchGreenSpaces, updateGreenSpaceHealth } from "@/controller/greenSpaceController";
 import { GreenSpace } from "@/models/greenSpace";
 
 export default function DashboardPage() {
@@ -97,10 +97,26 @@ const MapViewer = dynamic(() => import("../../components/MapViewer"), { ssr: fal
   const [greenSpacesLoading, setGreenSpacesLoading] = useState(true);
   const [greenSpacesError, setGreenSpacesError] = useState<string | null>(null);
   const [healthWindowDays, setHealthWindowDays] = useState<5 | 30>(30);
+  const [healthMetric, setHealthMetric] = useState<"uploads" | "leaves">("uploads");
 
   const getRollingWindowLabel = (days: number) => `Last ${days} days`;
 
   const getWindowStats = (zone: GreenSpace) => {
+    if (healthMetric === "leaves") {
+      if (healthWindowDays === 5) {
+        return {
+          total: zone.totalLeaves5 ?? 0,
+          healthy: zone.healthyLeaves5 ?? 0,
+          healthIndex: zone.leafHealthIndex5 ?? null,
+        };
+      }
+      return {
+        total: zone.totalLeaves ?? 0,
+        healthy: zone.healthyLeaves ?? 0,
+        healthIndex: zone.leafHealthIndex ?? null,
+      };
+    }
+
     if (healthWindowDays === 5) {
       return {
         total: zone.totalUploads5 ?? 0,
@@ -191,6 +207,52 @@ const MapViewer = dynamic(() => import("../../components/MapViewer"), { ssr: fal
 
   useEffect(() => refreshGreenSpaces(), []);
 
+  useEffect(() => {
+    if (healthWindowDays !== 5) return;
+    const missing = greenSpaces.filter(
+      (zone) => zone.totalUploads5 == null || zone.healthIndex5 === undefined
+    );
+    if (missing.length === 0) return;
+
+    let active = true;
+    (async () => {
+      try {
+        await Promise.all(missing.map((zone) => updateGreenSpaceHealth(zone.id)));
+        const refreshed = await fetchGreenSpaces();
+        if (active) setGreenSpaces(refreshed);
+      } catch (err) {
+        console.error("Failed to backfill 5-day health stats:", err);
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [healthWindowDays, greenSpaces]);
+
+  useEffect(() => {
+    if (healthMetric !== "leaves") return;
+    const missing = greenSpaces.filter(
+      (zone) => zone.totalLeaves == null || zone.leafHealthIndex === undefined
+    );
+    if (missing.length === 0) return;
+
+    let active = true;
+    (async () => {
+      try {
+        await Promise.all(missing.map((zone) => updateGreenSpaceHealth(zone.id)));
+        const refreshed = await fetchGreenSpaces();
+        if (active) setGreenSpaces(refreshed);
+      } catch (err) {
+        console.error("Failed to backfill leaf health stats:", err);
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [healthMetric, greenSpaces]);
+
 const exportToPDF = async () => {
   if (!lastResult) return;
 
@@ -268,14 +330,17 @@ const exportToCSV = () => {
     if (greenSpaces.length === 0) return;
 
     const rollingWindowLabel = getRollingWindowLabel(healthWindowDays);
+    const totalLabel = healthMetric === "leaves" ? "Total leaves" : "Total uploads";
+    const healthyLabel = healthMetric === "leaves" ? "Healthy leaves" : "Healthy uploads";
+    const diseasedLabel = healthMetric === "leaves" ? "Diseased leaves" : "Diseased uploads";
     const rows = [
       [
         "Name",
         `Health level (${rollingWindowLabel})`,
         "Health %",
-        `Observations (${rollingWindowLabel})`,
-        "Healthy leaves",
-        "Diseased leaves",
+        `${totalLabel} (${rollingWindowLabel})`,
+        healthyLabel,
+        diseasedLabel,
       ],
       ...greenSpaces.map((zone) => {
         const { total, healthy } = getWindowStats(zone);
@@ -537,6 +602,29 @@ const exportToCSV = () => {
                       </CardDescription>
                     </div>
                     <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600">
+                      <span className="font-semibold text-slate-600">Metric</span>
+                      <button
+                        type="button"
+                        onClick={() => setHealthMetric("uploads")}
+                        className={`rounded-full border px-3 py-1 font-semibold ${
+                          healthMetric === "uploads"
+                            ? "border-emerald-600 bg-emerald-50 text-emerald-700"
+                            : "border-slate-300 text-slate-600 hover:bg-slate-50"
+                        }`}
+                      >
+                        Uploads
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setHealthMetric("leaves")}
+                        className={`rounded-full border px-3 py-1 font-semibold ${
+                          healthMetric === "leaves"
+                            ? "border-emerald-600 bg-emerald-50 text-emerald-700"
+                            : "border-slate-300 text-slate-600 hover:bg-slate-50"
+                        }`}
+                      >
+                        Leaves
+                      </button>
                       <span className="rounded-full bg-emerald-50 px-2 py-1 text-emerald-700">
                         Healthy: {greenSpaceSummary.healthy}
                       </span>
@@ -586,10 +674,15 @@ const exportToCSV = () => {
                             </th>
                             <th className="px-3 py-2">Health %</th>
                             <th className="px-3 py-2">
-                              Observations ({getRollingWindowLabel(healthWindowDays)})
+                              {healthMetric === "leaves" ? "Total leaves" : "Total uploads"} (
+                              {getRollingWindowLabel(healthWindowDays)})
                             </th>
-                            <th className="px-3 py-2">Healthy leaves</th>
-                            <th className="px-3 py-2">Diseased leaves</th>
+                            <th className="px-3 py-2">
+                              {healthMetric === "leaves" ? "Healthy leaves" : "Healthy uploads"}
+                            </th>
+                            <th className="px-3 py-2">
+                              {healthMetric === "leaves" ? "Diseased leaves" : "Diseased uploads"}
+                            </th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
