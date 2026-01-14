@@ -40,7 +40,7 @@ export default function Page() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [pendingPhotoFile, setPendingPhotoFile] = useState<File | null>(null);
   const [pendingPhotoUrl, setPendingPhotoUrl] = useState<string | null>(null);
-  const [healthWindowDays, setHealthWindowDays] = useState<5 | 30>(30);
+  const [healthWindowDays, setHealthWindowDays] = useState<1 | 30>(30);
   const [analyticsView, setAnalyticsView] = useState<"chart" | "table">("chart");
   const [analyticsStart, setAnalyticsStart] = useState<string>("");
   const [analyticsEnd, setAnalyticsEnd] = useState<string>("");
@@ -58,10 +58,10 @@ export default function Page() {
     return { start: toISODate(start), end: toISODate(end) };
   };
 
-  const getRollingWindowLabel = (days: number) => `Last ${days} days`;
+  const getRollingWindowLabel = (days: number) => (days === 1 ? "Daily" : "Monthly");
 
   const getWindowStats = (zone: GreenSpace) => {
-    if (healthWindowDays === 5) {
+    if (healthWindowDays === 1) {
       return {
         total: zone.totalUploads5 ?? 0,
         healthy: zone.healthyUploads5 ?? 0,
@@ -190,7 +190,7 @@ export default function Page() {
   };
 
   useEffect(() => {
-    if (healthWindowDays !== 5) return;
+    if (healthWindowDays !== 1) return;
     let active = true;
 
     (async () => {
@@ -210,7 +210,7 @@ export default function Page() {
         setRefreshKey((v) => v + 1);
         if (!analyticsLoading) await refreshAnalytics();
       } catch (err) {
-        console.error("Failed to backfill 5-day health stats:", err);
+        console.error("Failed to backfill daily health stats:", err);
       }
     })();
 
@@ -352,18 +352,18 @@ export default function Page() {
                         : "border-slate-300 text-slate-600 hover:bg-slate-50"
                     }`}
                   >
-                    30 days
+                    Monthly
                   </button>
                   <button
                     type="button"
-                    onClick={() => setHealthWindowDays(5)}
+                    onClick={() => setHealthWindowDays(1)}
                     className={`rounded-full border px-3 py-1 font-semibold ${
-                      healthWindowDays === 5
+                      healthWindowDays === 1
                         ? "border-emerald-600 bg-emerald-50 text-emerald-700"
                         : "border-slate-300 text-slate-600 hover:bg-slate-50"
                     }`}
                   >
-                    5 days
+                    Daily
                   </button>
                 </div>
               </div>

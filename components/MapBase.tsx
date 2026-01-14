@@ -25,7 +25,7 @@ type MapBaseProps = {
   onZoneSelect?: (zone: GreenSpace | null) => void;
   refreshKey?: number;
   mapId?: string;
-  healthWindowDays?: 5 | 30;
+  healthWindowDays?: 1 | 30;
 };
 
 export default function MapBase({
@@ -58,10 +58,10 @@ export default function MapBase({
 
   const zonesRef = useRef<HibiscusZone[]>([]);
 
-  const getRollingWindowLabel = (days: number) => `Last ${days} days`;
+  const getRollingWindowLabel = (days: number) => (days === 1 ? "Daily" : "Monthly");
 
   const getWindowStats = (z: HibiscusZone) => {
-    if (healthWindowDays === 5) {
+    if (healthWindowDays === 1) {
       return {
         total: z.totalUploads5 ?? 0,
         healthIndex: z.healthIndex5 ?? null,
@@ -318,7 +318,7 @@ const legend = (L as any).control({ position: "topright" });
   }, [mapReady, refreshKey]);
 
   useEffect(() => {
-    if (!mapReady || healthWindowDays !== 5) return;
+    if (!mapReady || healthWindowDays !== 1) return;
     const missing = zones.filter(
       (z) => z.totalUploads5 == null || z.healthIndex5 === undefined
     );
@@ -331,7 +331,7 @@ const legend = (L as any).control({ position: "topright" });
         const refreshed = await fetchGreenSpaces();
         if (active) setZones(refreshed);
       } catch (err) {
-        console.error("Failed to backfill 5-day health stats:", err);
+        console.error("Failed to backfill daily health stats:", err);
       }
     })();
 
@@ -552,7 +552,6 @@ const legend = (L as any).control({ position: "topright" });
               <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-3 text-sm text-emerald-900">
                 <p className="font-semibold">Prediction Result</p>
                 <p>{lastResult.status}</p>
-                <p>{lastResult.predictedClass}</p>
                 <p className="mt-2 text-xs text-emerald-800">
                   Healthy leaves: {lastResult.summary?.healthy ?? 0}
                 </p>

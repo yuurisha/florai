@@ -50,7 +50,7 @@ classifier = timm.create_model(
 classifier.load_state_dict(torch.load(CLF_PATH, map_location=device))
 classifier = classifier.to(device).eval()
 
-IDX_TO_LABEL = {0: "diseased", 1: "healthy"}
+IDX_TO_LABEL = {0: "healthy", 1: "diseased"}
 
 clf_tfms = transforms.Compose([
     transforms.Resize((224, 224)),
@@ -171,7 +171,7 @@ async def predict(file: UploadFile = File(...)):
         label, cls_conf = classify_leaf(crop)
 
         final_label = label
-        if cls_conf >= 0.6:
+        if cls_conf >= 0.75:
             if label == "healthy":
                 healthy += 1
             else:

@@ -50,10 +50,10 @@ export const uploadLeafPhotoAndPredict = async (file: File, greenSpaceId: string
     };
 
     const observationStatus =
-      summary.total > 0
-        ? summary.diseased > 0
-          ? "Diseased"
-          : "Healthy"
+      status === "Healthy"
+        ? "Healthy"
+        : status === "Moderate" || status === "Unhealthy"
+        ? "Diseased"
         : "Unknown";
 
     console.log("✅ prediction received:", { predictedClass, status });

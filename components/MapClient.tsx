@@ -10,7 +10,7 @@ type MapClientProps = {
   onZoneSelect?: (zone: GreenSpace | null) => void;
   refreshKey?: number;
   mapId?: string;
-  healthWindowDays?: 5 | 30;
+  healthWindowDays?: 1 | 30;
 };
 
 export default function MapClient({

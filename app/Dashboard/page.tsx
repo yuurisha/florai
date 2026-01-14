@@ -96,19 +96,19 @@ const MapViewer = dynamic(() => import("../../components/MapViewer"), { ssr: fal
   const [greenSpaces, setGreenSpaces] = useState<GreenSpace[]>([]);
   const [greenSpacesLoading, setGreenSpacesLoading] = useState(true);
   const [greenSpacesError, setGreenSpacesError] = useState<string | null>(null);
-  const [healthWindowDays, setHealthWindowDays] = useState<5 | 30>(30);
+  const [healthWindowDays, setHealthWindowDays] = useState<1 | 30>(30);
   const [healthMetric, setHealthMetric] = useState<"uploads" | "leaves">("uploads");
 
-  const getRollingWindowLabel = (days: number) => `Last ${days} days`;
+  const getRollingWindowLabel = (days: number) => (days === 1 ? "Daily" : "Monthly");
 
   const getWindowStats = (zone: GreenSpace) => {
     if (healthMetric === "leaves") {
-      if (healthWindowDays === 5) {
-        return {
-          total: zone.totalLeaves5 ?? 0,
-          healthy: zone.healthyLeaves5 ?? 0,
-          healthIndex: zone.leafHealthIndex5 ?? null,
-        };
+    if (healthWindowDays === 1) {
+      return {
+        total: zone.totalLeaves5 ?? 0,
+        healthy: zone.healthyLeaves5 ?? 0,
+        healthIndex: zone.leafHealthIndex5 ?? null,
+      };
       }
       return {
         total: zone.totalLeaves ?? 0,
@@ -117,7 +117,7 @@ const MapViewer = dynamic(() => import("../../components/MapViewer"), { ssr: fal
       };
     }
 
-    if (healthWindowDays === 5) {
+    if (healthWindowDays === 1) {
       return {
         total: zone.totalUploads5 ?? 0,
         healthy: zone.healthyUploads5 ?? 0,
@@ -208,10 +208,10 @@ const MapViewer = dynamic(() => import("../../components/MapViewer"), { ssr: fal
   useEffect(() => refreshGreenSpaces(), []);
 
   useEffect(() => {
-    if (healthWindowDays !== 5) return;
-    const missing = greenSpaces.filter(
-      (zone) => zone.totalUploads5 == null || zone.healthIndex5 === undefined
-    );
+    if (healthWindowDays !== 1) return;
+      const missing = greenSpaces.filter(
+        (zone) => zone.totalUploads5 == null || zone.healthIndex5 === undefined
+      );
     if (missing.length === 0) return;
 
     let active = true;
@@ -221,7 +221,7 @@ const MapViewer = dynamic(() => import("../../components/MapViewer"), { ssr: fal
         const refreshed = await fetchGreenSpaces();
         if (active) setGreenSpaces(refreshed);
       } catch (err) {
-        console.error("Failed to backfill 5-day health stats:", err);
+        console.error("Failed to backfill daily health stats:", err);
       }
     })();
 
@@ -556,18 +556,18 @@ const exportToCSV = () => {
                             : "border-slate-300 text-slate-600 hover:bg-slate-50"
                         }`}
                       >
-                        30 days
+                        Monthly
                       </button>
                       <button
                         type="button"
-                        onClick={() => setHealthWindowDays(5)}
+                        onClick={() => setHealthWindowDays(1)}
                         className={`rounded-full border px-3 py-1 font-semibold ${
-                          healthWindowDays === 5
+                          healthWindowDays === 1
                             ? "border-emerald-600 bg-emerald-50 text-emerald-700"
                             : "border-slate-300 text-slate-600 hover:bg-slate-50"
                         }`}
                       >
-                        5 days
+                        Daily
                       </button>
                       <button
                         type="button"

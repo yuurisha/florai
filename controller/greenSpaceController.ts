@@ -136,7 +136,7 @@ export async function updateGreenSpaceHealth(greenSpaceId: string) {
   const ref = doc(db, "greenSpaces", greenSpaceId);
   const now = new Date();
   const start30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-  const start5 = new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000);
+  const start5 = new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000);
   const start30Ts = Timestamp.fromDate(start30);
 
   const recentSnap = await getDocs(
