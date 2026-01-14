@@ -213,7 +213,7 @@ export default function ManageSurveyPage() {
             <div>
               <h1 className="text-2xl font-bold text-green-800">Manage Surveys</h1>
               <p className="text-gray-600 mt-1">
-                Create, publish, favorite, and review survey responses.
+                Create, favorite, and review survey responses.
               </p>
             </div>
 

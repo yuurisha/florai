@@ -9,8 +9,16 @@ type MapClientProps = {
   mode: "user" | "admin";
   onZoneSelect?: (zone: GreenSpace | null) => void;
   refreshKey?: number;
+  mapId?: string;
 };
 
-export default function MapClient({ mode, onZoneSelect, refreshKey }: MapClientProps) {
-  return <MapBase mode={mode} onZoneSelect={onZoneSelect} refreshKey={refreshKey} />;
+export default function MapClient({ mode, onZoneSelect, refreshKey, mapId }: MapClientProps) {
+  return (
+    <MapBase
+      mode={mode}
+      onZoneSelect={onZoneSelect}
+      refreshKey={refreshKey}
+      mapId={mapId}
+    />
+  );
 }
