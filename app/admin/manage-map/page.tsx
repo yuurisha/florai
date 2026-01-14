@@ -13,7 +13,7 @@ import {
   uploadGreenSpacePhoto,
 } from "@/controller/greenSpaceController";
 import { fetchGreenSpaces } from "@/controller/greenSpaceController";
-import { collection, getDocs, limit, orderBy, query } from "firebase/firestore";
+import { collection, getDocs, orderBy, query, where, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebaseConfig";
 
 type DrawAction = "draw" | "edit" | "delete";
@@ -40,13 +40,23 @@ export default function Page() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [pendingPhotoFile, setPendingPhotoFile] = useState<File | null>(null);
   const [pendingPhotoUrl, setPendingPhotoUrl] = useState<string | null>(null);
-  const [showTable, setShowTable] = useState(false);
-  const [tableLoading, setTableLoading] = useState(false);
-  const [tableError, setTableError] = useState<string | null>(null);
-  const [tableRows, setTableRows] = useState<
-    { zone: GreenSpace; latestUpload: string | null }[]
-  >([]);
   const [healthWindowDays, setHealthWindowDays] = useState<5 | 30>(30);
+  const [analyticsView, setAnalyticsView] = useState<"chart" | "table">("chart");
+  const [analyticsStart, setAnalyticsStart] = useState<string>("");
+  const [analyticsEnd, setAnalyticsEnd] = useState<string>("");
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [analyticsError, setAnalyticsError] = useState<string | null>(null);
+  const [analyticsRows, setAnalyticsRows] = useState<
+    { id: string; name: string; total: number; dailyAvg: number }[]
+  >([]);
+  const [analyticsDaily, setAnalyticsDaily] = useState<{ day: string; total: number }[]>([]);
+
+  const initAnalyticsRange = () => {
+    const end = new Date();
+    const start = new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const toISODate = (d: Date) => d.toISOString().slice(0, 10);
+    return { start: toISODate(start), end: toISODate(end) };
+  };
 
   const getRollingWindowLabel = (days: number) => `Last ${days} days`;
 
@@ -82,103 +92,6 @@ export default function Page() {
     return `${Math.round(healthIndex * 100)}%`;
   };
 
-  const formatUploadDate = (value: any) => {
-    try {
-      if (value && typeof value.toDate === "function") {
-        return value.toDate().toLocaleString();
-      }
-      if (typeof value === "number") {
-        return new Date(value).toLocaleString();
-      }
-    } catch {}
-    return "—";
-  };
-
-  const refreshTable = async () => {
-    setTableLoading(true);
-    setTableError(null);
-    try {
-      const zones = await fetchGreenSpaces();
-      const zoneIds = new Set(zones.map((zone) => zone.id));
-      const latestUploads = new Map<string, any>();
-
-      const uploadsRef = collection(db, "uploads");
-      const uploadsSnap = await getDocs(
-        query(uploadsRef, orderBy("createdAt", "desc"), limit(500))
-      );
-
-      uploadsSnap.docs.forEach((docSnap) => {
-        const data = docSnap.data() as any;
-        const greenSpaceId = data?.greenSpaceId as string | undefined;
-        if (!greenSpaceId || !zoneIds.has(greenSpaceId)) return;
-        if (latestUploads.has(greenSpaceId)) return;
-        latestUploads.set(greenSpaceId, data?.createdAt ?? null);
-      });
-
-      const rows = zones.map((zone) => ({
-        zone,
-        latestUpload: latestUploads.get(zone.id) ?? null,
-      }));
-
-      setTableRows(rows);
-    } catch (err: any) {
-      console.error(err);
-      setTableError("Failed to load table data.");
-    } finally {
-      setTableLoading(false);
-    }
-  };
-
-  const exportTableToCSV = () => {
-    if (tableRows.length === 0) return;
-
-    const rollingWindowLabel = getRollingWindowLabel(healthWindowDays);
-    const rows = [
-      [
-        "Name",
-        `Health level (${rollingWindowLabel})`,
-        "Health %",
-        `Observations (${rollingWindowLabel})`,
-        "Healthy leaves",
-        "Diseased leaves",
-        "Latest photo upload",
-      ],
-      ...tableRows.map(({ zone, latestUpload }) => {
-        const { total, healthy } = getWindowStats(zone);
-        const diseased = Math.max(total - healthy, 0);
-        return [
-          zone.name,
-          getHealthLabel(zone),
-          getHealthPercent(zone),
-          String(total),
-          String(healthy),
-          String(diseased),
-          latestUpload ? formatUploadDate(latestUpload) : "—",
-        ];
-      }),
-    ];
-
-    const escapeCSV = (v: string) => {
-      if (v.includes(",") || v.includes('"') || v.includes("\n")) {
-        return `"${v.replace(/"/g, '""')}"`;
-      }
-      return v;
-    };
-
-    const csvContent = rows
-      .map((row) => row.map((cell) => escapeCSV(String(cell))).join(","))
-      .join("\n");
-
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = window.URL.createObjectURL(blob);
-
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `green-spaces-admin-${new Date().toISOString().slice(0, 10)}.csv`;
-    link.click();
-
-    window.URL.revokeObjectURL(url);
-  };
 
   useEffect(() => {
     setZoneName(selectedZone?.name ?? "");
@@ -195,9 +108,86 @@ export default function Page() {
   }, [sidebarOpen]);
 
   useEffect(() => {
-    if (!showTable) return;
-    refreshTable();
-  }, [showTable, refreshKey]);
+    if (analyticsStart || analyticsEnd) return;
+    const range = initAnalyticsRange();
+    setAnalyticsStart(range.start);
+    setAnalyticsEnd(range.end);
+  }, [analyticsStart, analyticsEnd]);
+
+  useEffect(() => {
+    if (!analyticsStart || !analyticsEnd) return;
+    if (analyticsRows.length > 0 || analyticsLoading) return;
+    refreshAnalytics();
+  }, [analyticsStart, analyticsEnd, analyticsRows.length, analyticsLoading]);
+
+  const refreshAnalytics = async () => {
+    if (!analyticsStart || !analyticsEnd) return;
+    setAnalyticsLoading(true);
+    setAnalyticsError(null);
+    try {
+      const [zones, uploadsSnap] = await Promise.all([
+        fetchGreenSpaces(),
+        getDocs(
+          query(
+            collection(db, "uploads"),
+            where("createdAt", ">=", Timestamp.fromDate(new Date(analyticsStart))),
+            where("createdAt", "<=", Timestamp.fromDate(new Date(`${analyticsEnd}T23:59:59`))),
+            orderBy("createdAt", "asc")
+          )
+        ),
+      ]);
+
+      const zoneMap = new Map(zones.map((zone) => [zone.id, zone.name]));
+      const totals = new Map<string, number>();
+      const daily = new Map<string, number>();
+
+      uploadsSnap.docs.forEach((docSnap) => {
+        const data = docSnap.data() as any;
+        const zoneId = data?.greenSpaceId as string | undefined;
+        if (!zoneId) return;
+        totals.set(zoneId, (totals.get(zoneId) ?? 0) + 1);
+
+        const createdAt = data?.createdAt;
+        const createdAtDate =
+          createdAt && typeof createdAt.toDate === "function" ? createdAt.toDate() : null;
+        if (!createdAtDate) return;
+        const dayKey = createdAtDate.toISOString().slice(0, 10);
+        daily.set(dayKey, (daily.get(dayKey) ?? 0) + 1);
+      });
+
+      const startDate = new Date(analyticsStart);
+      const endDate = new Date(analyticsEnd);
+      const dayCount =
+        Math.max(
+          1,
+          Math.floor((endDate.getTime() - startDate.getTime()) / (24 * 60 * 60 * 1000)) + 1
+        );
+
+      const rows = Array.from(zoneMap.entries()).map(([id, name]) => {
+        const total = totals.get(id) ?? 0;
+        return {
+          id,
+          name,
+          total,
+          dailyAvg: Number((total / dayCount).toFixed(2)),
+        };
+      });
+
+      rows.sort((a, b) => b.total - a.total);
+
+      const dailyRows = Array.from(daily.entries())
+        .map(([day, total]) => ({ day, total }))
+        .sort((a, b) => a.day.localeCompare(b.day));
+
+      setAnalyticsRows(rows);
+      setAnalyticsDaily(dailyRows);
+    } catch (err) {
+      console.error(err);
+      setAnalyticsError("Failed to load analytics.");
+    } finally {
+      setAnalyticsLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (healthWindowDays !== 5) return;
@@ -218,7 +208,7 @@ export default function Page() {
           if (updated) setSelectedZone(updated);
         }
         setRefreshKey((v) => v + 1);
-        if (showTable) await refreshTable();
+        if (!analyticsLoading) await refreshAnalytics();
       } catch (err) {
         console.error("Failed to backfill 5-day health stats:", err);
       }
@@ -227,7 +217,7 @@ export default function Page() {
     return () => {
       active = false;
     };
-  }, [healthWindowDays, selectedZone, showTable]);
+  }, [healthWindowDays, selectedZone, analyticsStart, analyticsEnd]);
 
   useEffect(() => {
     let cancelled = false;
@@ -393,105 +383,137 @@ export default function Page() {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h3 className="text-base font-semibold text-slate-900">
-                  Green Space Table
+                  Admin Analytics
                 </h3>
                 <p className="text-xs text-slate-600">
-                  Health summary with latest photo upload time.
+                  Aggregated submission activity by green space and time range.
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2 text-xs">
+                <span className="font-semibold text-slate-600">View</span>
                 <button
                   type="button"
-                  onClick={() => setShowTable((v) => !v)}
-                  className="inline-flex items-center gap-2 rounded border border-slate-300 px-3 py-2 font-semibold text-slate-700 hover:bg-slate-50"
+                  onClick={() => setAnalyticsView("chart")}
+                  className={`rounded-full border px-3 py-1 font-semibold ${
+                    analyticsView === "chart"
+                      ? "border-emerald-600 bg-emerald-50 text-emerald-700"
+                      : "border-slate-300 text-slate-600 hover:bg-slate-50"
+                  }`}
                 >
-                  {showTable ? "Hide Table" : "Show Table"}
+                  Chart
                 </button>
                 <button
                   type="button"
-                  onClick={refreshTable}
-                  disabled={!showTable || tableLoading}
+                  onClick={() => setAnalyticsView("table")}
+                  className={`rounded-full border px-3 py-1 font-semibold ${
+                    analyticsView === "table"
+                      ? "border-emerald-600 bg-emerald-50 text-emerald-700"
+                      : "border-slate-300 text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  Table
+                </button>
+                <button
+                  type="button"
+                  onClick={refreshAnalytics}
+                  disabled={analyticsLoading}
                   className="inline-flex items-center gap-2 rounded border border-slate-300 px-3 py-2 font-semibold text-slate-700 hover:bg-slate-50 disabled:border-slate-200 disabled:text-slate-400"
                 >
                   Refresh
                 </button>
-                <button
-                  type="button"
-                  onClick={exportTableToCSV}
-                  disabled={!showTable || tableLoading || tableRows.length === 0}
-                  className="inline-flex items-center gap-2 rounded border border-green-600 px-3 py-2 font-semibold text-green-700 hover:bg-green-50 disabled:border-slate-200 disabled:text-slate-400"
-                >
-                  Export Excel
-                </button>
               </div>
             </div>
 
-            {showTable ? (
-              <div className="mt-4">
-                {tableLoading ? (
-                  <div className="text-sm text-slate-600">Loading table…</div>
-                ) : tableError ? (
-                  <div className="text-sm text-red-600">{tableError}</div>
-                ) : tableRows.length === 0 ? (
-                  <div className="text-sm text-slate-600">No green spaces found.</div>
-                ) : (
-                  <div className="overflow-x-auto rounded-xl border border-slate-200">
-                    <table className="min-w-full text-sm">
-                      <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
-                        <tr>
-                          <th className="px-3 py-2">Name</th>
-                        <th className="px-3 py-2">
-                          Health level ({getRollingWindowLabel(healthWindowDays)})
-                        </th>
-                        <th className="px-3 py-2">Health %</th>
-                        <th className="px-3 py-2">
-                          Observations ({getRollingWindowLabel(healthWindowDays)})
-                        </th>
-                          <th className="px-3 py-2">Healthy leaves</th>
-                          <th className="px-3 py-2">Diseased leaves</th>
-                          <th className="px-3 py-2">Latest photo upload</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-200">
-                        {tableRows.map(({ zone, latestUpload }) => {
-                          const { total, healthy } = getWindowStats(zone);
-                          const diseased = Math.max(total - healthy, 0);
-                          const healthLabel = getHealthLabel(zone);
-                          const healthClass =
-                            healthLabel === "Healthy"
-                              ? "bg-emerald-50 text-emerald-700"
-                              : healthLabel === "Moderate"
-                              ? "bg-amber-50 text-amber-700"
-                              : healthLabel === "Unhealthy"
-                              ? "bg-red-50 text-red-700"
-                              : "bg-slate-100 text-slate-600";
-
-                          return (
-                            <tr key={zone.id} className="bg-white">
-                              <td className="px-3 py-3 font-medium text-slate-900">
-                                {zone.name}
-                              </td>
-                              <td className="px-3 py-3">
-                                <span className={`rounded-full px-2 py-1 text-xs ${healthClass}`}>
-                                  {healthLabel}
-                                </span>
-                              </td>
-                              <td className="px-3 py-3">{getHealthPercent(zone)}</td>
-                              <td className="px-3 py-3">{total}</td>
-                              <td className="px-3 py-3">{healthy}</td>
-                              <td className="px-3 py-3">{diseased}</td>
-                              <td className="px-3 py-3">
-                                {latestUpload ? formatUploadDate(latestUpload) : "—"}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
+            <div className="mt-4 space-y-4">
+              <div className="flex flex-wrap items-end gap-3 text-xs">
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-600">
+                    Start date
+                  </label>
+                  <input
+                    type="date"
+                    value={analyticsStart}
+                    onChange={(e) => setAnalyticsStart(e.target.value)}
+                    className="rounded-lg border border-slate-200 px-3 py-2 text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-600">
+                    End date
+                  </label>
+                  <input
+                    type="date"
+                    value={analyticsEnd}
+                    onChange={(e) => setAnalyticsEnd(e.target.value)}
+                    className="rounded-lg border border-slate-200 px-3 py-2 text-xs"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={refreshAnalytics}
+                  disabled={!analyticsStart || !analyticsEnd || analyticsLoading}
+                  className="inline-flex items-center gap-2 rounded border border-emerald-600 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:border-slate-200 disabled:text-slate-400"
+                >
+                  Apply range
+                </button>
               </div>
-            ) : null}
+
+              {analyticsLoading ? (
+                <div className="text-sm text-slate-600">Loading analytics…</div>
+              ) : analyticsError ? (
+                <div className="text-sm text-red-600">{analyticsError}</div>
+              ) : analyticsView === "chart" ? (
+                <div className="rounded-xl border border-slate-200 p-4">
+                  <div className="text-xs font-semibold text-slate-600">
+                    Daily uploads (all green spaces)
+                  </div>
+                  {analyticsDaily.length === 0 ? (
+                    <div className="mt-2 text-sm text-slate-500">
+                      No uploads in this range.
+                    </div>
+                  ) : (
+                    <div className="mt-4 flex h-40 items-end gap-1">
+                      {analyticsDaily.map((row) => {
+                        const max = Math.max(...analyticsDaily.map((d) => d.total), 1);
+                        const height = Math.round((row.total / max) * 100);
+                        return (
+                          <div key={row.day} className="flex-1">
+                            <div
+                              className="w-full rounded-t bg-emerald-500/80"
+                              style={{ height: `${height}%` }}
+                              title={`${row.day}: ${row.total}`}
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="overflow-x-auto rounded-xl border border-slate-200">
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
+                      <tr>
+                        <th className="px-3 py-2">Green space</th>
+                        <th className="px-3 py-2">Total uploads</th>
+                        <th className="px-3 py-2">Daily average</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200">
+                      {analyticsRows.map((row) => (
+                        <tr key={row.id} className="bg-white">
+                          <td className="px-3 py-3 font-medium text-slate-900">
+                            {row.name}
+                          </td>
+                          <td className="px-3 py-3">{row.total}</td>
+                          <td className="px-3 py-3">{row.dailyAvg}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           </div>
 
           <button
