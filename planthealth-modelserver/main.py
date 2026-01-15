@@ -50,7 +50,7 @@ classifier = timm.create_model(
 classifier.load_state_dict(torch.load(CLF_PATH, map_location=device))
 classifier = classifier.to(device).eval()
 
-IDX_TO_LABEL = {0: "diseased", 1: "healthy"}
+IDX_TO_LABEL = {0: "healthy", 1: "diseased"}
 
 clf_tfms = transforms.Compose([
     transforms.Resize((224, 224)),
@@ -73,17 +73,39 @@ def classify_leaf(pil_img):
     return IDX_TO_LABEL[idx], float(probs[idx])
 
 
-def photo_health_level(healthy, diseased):
-    total = healthy + diseased
-    if total == 0:
+def compute_metrics(healthy: int, diseased: int):
+    """
+    Computes Health Ratio and Disease Incidence using ONLY counted leaves
+    (healthy + diseased). Uncertain is excluded.
+    """
+    counted = healthy + diseased
+    if counted == 0:
+        return {
+            "counted": 0,
+            "health_ratio": None,
+            "disease_incidence": None,
+        }
+
+    health_ratio = healthy / counted
+    disease_incidence = diseased / counted
+    return {
+        "counted": counted,
+        "health_ratio": float(health_ratio),
+        "disease_incidence": float(disease_incidence),
+    }
+
+
+def photo_health_level_from_incidence(disease_incidence: float | None, counted: int):
+    if counted == 0 or disease_incidence is None:
         return "Unknown"
-    alpha = 1
-    score = (healthy + alpha) / (total + 2 * alpha)
-    if score >= 0.8:
+
+    # ✅ tweak these thresholds to your preference
+    if disease_incidence <= 0.20:
         return "Healthy"
-    if score >= 0.6:
+    if disease_incidence <= 0.40:
         return "Moderate"
     return "Unhealthy"
+
 
 # --------------------
 # Routes
@@ -110,41 +132,111 @@ async def predict(file: UploadFile = File(...)):
 
     healthy = 0
     diseased = 0
+    uncertain = 0
     detections = []
 
-    if results.boxes is not None:
-        for box in results.boxes:
-            x1, y1, x2, y2 = box.xyxy[0].cpu().numpy().tolist()
-            det_conf = float(box.conf[0])
+    # --- STATE A: No leaf detected by YOLO at all ---
+    if results.boxes is None or len(results.boxes) == 0:
+        return {
+            "status": "NoLeafDetected",
+            "message": "No leaf detected. Please try again with a clearer photo (closer leaf, better lighting).",
+            "summary": {
+                "healthy": 0,
+                "diseased": 0,
+                "uncertain": 0,
+                "total_counted": 0,
+                "total_all": 0,
+            },
+            "metrics": {
+                "health_ratio": None,
+                "disease_incidence": None,
+            },
+            "detections": [],
+        }
 
-            # filter tiny noise
-            if (x2 - x1) < 20 or (y2 - y1) < 20:
-                continue
+    # If boxes exist, process them
+    for box in results.boxes:
+        x1, y1, x2, y2 = box.xyxy[0].cpu().numpy().tolist()
+        det_conf = float(box.conf[0])
 
-            crop = img.crop((x1, y1, x2, y2))
-            label, cls_conf = classify_leaf(crop)
+        # (Optional extra safety)
+        # if det_conf < DET_CONF:
+        #     continue
 
-            if cls_conf >= 0.6:
-                if label == "healthy":
-                    healthy += 1
-                else:
-                    diseased += 1
+        # filter tiny noise
+        if (x2 - x1) < 20 or (y2 - y1) < 20:
+            continue
+
+        crop = img.crop((x1, y1, x2, y2))
+        label, cls_conf = classify_leaf(crop)
+
+        final_label = label
+        if cls_conf >= 0.75:
+            if label == "healthy":
+                healthy += 1
             else:
-                label = "uncertain"
+                diseased += 1
+        else:
+            final_label = "uncertain"
+            uncertain += 1
 
-            detections.append({
-                "bbox": [x1, y1, x2, y2],
-                "confidence": det_conf,
-                "leaf_class": label,
-                "leaf_conf": cls_conf,
-            })
+        detections.append({
+            "bbox": [x1, y1, x2, y2],
+            "confidence": det_conf,
+            "leaf_class": final_label,
+            "leaf_conf": cls_conf,
+        })
+
+    # --- STATE B: YOLO found boxes, but after filtering they are all unusable ---
+    if len(detections) == 0:
+        return {
+            "status": "LeafNotClear",
+            "message": "Leaf was detected but the regions were too small/unclear to classify. Try a closer photo.",
+            "summary": {
+                "healthy": 0,
+                "diseased": 0,
+                "uncertain": 0,
+                "total_counted": 0,
+                "total_all": 0,
+            },
+            "metrics": {
+                "health_ratio": None,
+                "disease_incidence": None,
+            },
+            "detections": [],
+        }
+
+    # --- STATE C: We have usable detections -> compute incidence/ratio ---
+    counted = healthy + diseased
+    if counted == 0:
+        health_ratio = None
+        disease_incidence = None
+        final_status = "Unknown"  # only uncertain
+    else:
+        health_ratio = healthy / counted
+        disease_incidence = diseased / counted
+
+        # thresholds using disease incidence
+        if disease_incidence <= 0.20:
+            final_status = "Healthy"
+        elif disease_incidence <= 0.40:
+            final_status = "Moderate"
+        else:
+            final_status = "Unhealthy"
 
     return {
-        "status": photo_health_level(healthy, diseased),
+        "status": final_status,
+        "message": "OK",
         "summary": {
             "healthy": healthy,
             "diseased": diseased,
-            "total": healthy + diseased,
+            "uncertain": uncertain,
+            "total_counted": counted,        # healthy+diseased only
+            "total_all": len(detections),    # includes uncertain
+        },
+        "metrics": {
+            "health_ratio": None if health_ratio is None else float(health_ratio),
+            "disease_incidence": None if disease_incidence is None else float(disease_incidence),
         },
         "detections": detections,
     }
