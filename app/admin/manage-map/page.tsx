@@ -41,15 +41,14 @@ export default function Page() {
   const [pendingPhotoFile, setPendingPhotoFile] = useState<File | null>(null);
   const [pendingPhotoUrl, setPendingPhotoUrl] = useState<string | null>(null);
   const [healthWindowDays, setHealthWindowDays] = useState<1 | 30>(30);
-  const [analyticsView, setAnalyticsView] = useState<"chart" | "table">("chart");
   const [analyticsStart, setAnalyticsStart] = useState<string>("");
   const [analyticsEnd, setAnalyticsEnd] = useState<string>("");
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [analyticsError, setAnalyticsError] = useState<string | null>(null);
+  const [analyticsSort, setAnalyticsSort] = useState<"newest" | "oldest">("newest");
   const [analyticsRows, setAnalyticsRows] = useState<
-    { id: string; name: string; total: number; dailyAvg: number }[]
+    { id: string; name: string; total: number; dailyAvg: number; updatedAt: Date | null }[]
   >([]);
-  const [analyticsDaily, setAnalyticsDaily] = useState<{ day: string; total: number }[]>([]);
 
   const initAnalyticsRange = () => {
     const end = new Date();
@@ -59,6 +58,18 @@ export default function Page() {
   };
 
   const getRollingWindowLabel = (days: number) => (days === 1 ? "Daily" : "Monthly");
+
+  const formatDateTime = (value: any) => {
+    if (!value) return "—";
+    const date =
+      typeof value?.toDate === "function"
+        ? value.toDate()
+        : value instanceof Date
+        ? value
+        : new Date(value);
+    if (Number.isNaN(date.getTime())) return "—";
+    return date.toLocaleString();
+  };
 
   const getWindowStats = (zone: GreenSpace) => {
     if (healthWindowDays === 1) {
@@ -137,22 +148,31 @@ export default function Page() {
         ),
       ]);
 
-      const zoneMap = new Map(zones.map((zone) => [zone.id, zone.name]));
+      const zoneMap = new Map(
+        zones.map((zone) => [
+          zone.id,
+          {
+            name: zone.name,
+            updatedAt:
+              typeof zone.updatedAt?.toDate === "function"
+                ? zone.updatedAt.toDate()
+                : typeof zone.createdAt?.toDate === "function"
+                ? zone.createdAt.toDate()
+                : zone.updatedAt
+                ? new Date(zone.updatedAt)
+                : zone.createdAt
+                ? new Date(zone.createdAt)
+                : null,
+          },
+        ])
+      );
       const totals = new Map<string, number>();
-      const daily = new Map<string, number>();
 
       uploadsSnap.docs.forEach((docSnap) => {
         const data = docSnap.data() as any;
         const zoneId = data?.greenSpaceId as string | undefined;
         if (!zoneId) return;
         totals.set(zoneId, (totals.get(zoneId) ?? 0) + 1);
-
-        const createdAt = data?.createdAt;
-        const createdAtDate =
-          createdAt && typeof createdAt.toDate === "function" ? createdAt.toDate() : null;
-        if (!createdAtDate) return;
-        const dayKey = createdAtDate.toISOString().slice(0, 10);
-        daily.set(dayKey, (daily.get(dayKey) ?? 0) + 1);
       });
 
       const startDate = new Date(analyticsStart);
@@ -163,24 +183,25 @@ export default function Page() {
           Math.floor((endDate.getTime() - startDate.getTime()) / (24 * 60 * 60 * 1000)) + 1
         );
 
-      const rows = Array.from(zoneMap.entries()).map(([id, name]) => {
+      const rows = Array.from(zoneMap.entries()).map(([id, meta]) => {
         const total = totals.get(id) ?? 0;
         return {
           id,
-          name,
+          name: meta.name,
           total,
           dailyAvg: Number((total / dayCount).toFixed(2)),
+          updatedAt: meta.updatedAt ?? null,
         };
       });
 
-      rows.sort((a, b) => b.total - a.total);
-
-      const dailyRows = Array.from(daily.entries())
-        .map(([day, total]) => ({ day, total }))
-        .sort((a, b) => a.day.localeCompare(b.day));
+      rows.sort((a, b) => {
+        const aTime = a.updatedAt ? a.updatedAt.getTime() : -1;
+        const bTime = b.updatedAt ? b.updatedAt.getTime() : -1;
+        if (aTime === bTime) return b.total - a.total;
+        return analyticsSort === "newest" ? bTime - aTime : aTime - bTime;
+      });
 
       setAnalyticsRows(rows);
-      setAnalyticsDaily(dailyRows);
     } catch (err) {
       console.error(err);
       setAnalyticsError("Failed to load analytics.");
@@ -217,7 +238,7 @@ export default function Page() {
     return () => {
       active = false;
     };
-  }, [healthWindowDays, selectedZone, analyticsStart, analyticsEnd]);
+  }, [healthWindowDays, selectedZone, analyticsStart, analyticsEnd, analyticsSort]);
 
   useEffect(() => {
     let cancelled = false;
@@ -383,35 +404,35 @@ export default function Page() {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h3 className="text-base font-semibold text-slate-900">
-                  Admin Analytics
+                  Green Space Uploads
                 </h3>
                 <p className="text-xs text-slate-600">
-                  Aggregated submission activity by green space and time range.
+                  Upload totals by green space within the selected range.
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2 text-xs">
-                <span className="font-semibold text-slate-600">View</span>
+                <span className="font-semibold text-slate-600">Sort</span>
                 <button
                   type="button"
-                  onClick={() => setAnalyticsView("chart")}
+                  onClick={() => setAnalyticsSort("newest")}
                   className={`rounded-full border px-3 py-1 font-semibold ${
-                    analyticsView === "chart"
+                    analyticsSort === "newest"
                       ? "border-emerald-600 bg-emerald-50 text-emerald-700"
                       : "border-slate-300 text-slate-600 hover:bg-slate-50"
                   }`}
                 >
-                  Chart
+                  Newest updated
                 </button>
                 <button
                   type="button"
-                  onClick={() => setAnalyticsView("table")}
+                  onClick={() => setAnalyticsSort("oldest")}
                   className={`rounded-full border px-3 py-1 font-semibold ${
-                    analyticsView === "table"
+                    analyticsSort === "oldest"
                       ? "border-emerald-600 bg-emerald-50 text-emerald-700"
                       : "border-slate-300 text-slate-600 hover:bg-slate-50"
                   }`}
                 >
-                  Table
+                  Oldest updated
                 </button>
                 <button
                   type="button"
@@ -459,36 +480,9 @@ export default function Page() {
               </div>
 
               {analyticsLoading ? (
-                <div className="text-sm text-slate-600">Loading analytics…</div>
+                <div className="text-sm text-slate-600">Loading uploads…</div>
               ) : analyticsError ? (
                 <div className="text-sm text-red-600">{analyticsError}</div>
-              ) : analyticsView === "chart" ? (
-                <div className="rounded-xl border border-slate-200 p-4">
-                  <div className="text-xs font-semibold text-slate-600">
-                    Daily uploads (all green spaces)
-                  </div>
-                  {analyticsDaily.length === 0 ? (
-                    <div className="mt-2 text-sm text-slate-500">
-                      No uploads in this range.
-                    </div>
-                  ) : (
-                    <div className="mt-4 flex h-40 items-end gap-1">
-                      {analyticsDaily.map((row) => {
-                        const max = Math.max(...analyticsDaily.map((d) => d.total), 1);
-                        const height = Math.round((row.total / max) * 100);
-                        return (
-                          <div key={row.day} className="flex-1">
-                            <div
-                              className="w-full rounded-t bg-emerald-500/80"
-                              style={{ height: `${height}%` }}
-                              title={`${row.day}: ${row.total}`}
-                            />
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
               ) : (
                 <div className="overflow-x-auto rounded-xl border border-slate-200">
                   <table className="min-w-full text-sm">
@@ -497,6 +491,7 @@ export default function Page() {
                         <th className="px-3 py-2">Green space</th>
                         <th className="px-3 py-2">Total uploads</th>
                         <th className="px-3 py-2">Daily average</th>
+                        <th className="px-3 py-2">Last updated</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200">
@@ -507,6 +502,7 @@ export default function Page() {
                           </td>
                           <td className="px-3 py-3">{row.total}</td>
                           <td className="px-3 py-3">{row.dailyAvg}</td>
+                          <td className="px-3 py-3">{formatDateTime(row.updatedAt)}</td>
                         </tr>
                       ))}
                     </tbody>

@@ -586,6 +586,7 @@ const exportToCSV = () => {
                       mode="user"
                       mapId="user-map"
                       healthWindowDays={healthWindowDays}
+                      healthMetric={healthMetric}
                     />
                   </div>
                 </CardContent>

@@ -11,6 +11,7 @@ type MapClientProps = {
   refreshKey?: number;
   mapId?: string;
   healthWindowDays?: 1 | 30;
+  healthMetric?: "uploads" | "leaves";
 };
 
 export default function MapClient({
@@ -19,6 +20,7 @@ export default function MapClient({
   refreshKey,
   mapId,
   healthWindowDays,
+  healthMetric,
 }: MapClientProps) {
   return (
     <MapBase
@@ -27,6 +29,7 @@ export default function MapClient({
       refreshKey={refreshKey}
       mapId={mapId}
       healthWindowDays={healthWindowDays}
+      healthMetric={healthMetric}
     />
   );
 }

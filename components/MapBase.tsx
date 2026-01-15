@@ -26,6 +26,7 @@ type MapBaseProps = {
   refreshKey?: number;
   mapId?: string;
   healthWindowDays?: 1 | 30;
+  healthMetric?: "uploads" | "leaves";
 };
 
 export default function MapBase({
@@ -34,6 +35,7 @@ export default function MapBase({
   refreshKey,
   mapId,
   healthWindowDays = 30,
+  healthMetric = "uploads",
 }: MapBaseProps) {
   const mapElementId = mapId ?? "map";
   const [mapReady, setMapReady] = useState(false);
@@ -61,6 +63,19 @@ export default function MapBase({
   const getRollingWindowLabel = (days: number) => (days === 1 ? "Daily" : "Monthly");
 
   const getWindowStats = (z: HibiscusZone) => {
+    if (healthMetric === "leaves") {
+      if (healthWindowDays === 1) {
+        return {
+          total: z.totalLeaves5 ?? 0,
+          healthIndex: z.leafHealthIndex5 ?? null,
+        };
+      }
+      return {
+        total: z.totalLeaves ?? 0,
+        healthIndex: z.leafHealthIndex ?? null,
+      };
+    }
+
     if (healthWindowDays === 1) {
       return {
         total: z.totalUploads5 ?? 0,
@@ -74,6 +89,7 @@ export default function MapBase({
   };
 
   const buildLegendHtml = (rollingWindowLabel: string) => {
+    const metricLabel = healthMetric === "leaves" ? "Leaf Health" : "Plant Health";
     const row = (color: string, label: string) => `
       <div style="display:flex;align-items:center;gap:8px;margin-top:6px;">
         <span style="width:12px;height:12px;background:${color};display:inline-block;border-radius:3px;border:1px solid rgba(0,0,0,0.15)"></span>
@@ -82,7 +98,7 @@ export default function MapBase({
     `;
 
     return `
-      <div style="font-weight:700;margin-bottom:4px;">Plant Health</div>
+      <div style="font-weight:700;margin-bottom:4px;">${metricLabel}</div>
       ${row("#2ECC71", "Healthy")}
       ${row("#F1C40F", "Moderate")}
       ${row("#E74C3C", "Sick")}
@@ -423,6 +439,7 @@ const legend = (L as any).control({ position: "topright" });
       poly.on("click", () => {
         const { total } = getWindowStats(z);
         const healthText = getHealthLabel(z);
+        const metricLabel = healthMetric === "leaves" ? "Leaves" : "Uploads";
         const displayName = z.name.replace(/\s*\(\d{1,2}\/\d{1,2}\/\d{4}\)\s*$/, "");
 
         onZoneSelect?.(z);
@@ -452,7 +469,7 @@ const legend = (L as any).control({ position: "topright" });
         healthEl.style.marginBottom = "2px";
 
         const totalEl = L.DomUtil.create("div", "", infoCol);
-        totalEl.textContent = `Uploads (${rollingWindowLabel}): ${total}`;
+        totalEl.textContent = `${metricLabel} (${rollingWindowLabel}): ${total}`;
         totalEl.style.fontSize = "13px";
 
         const photoWrap = L.DomUtil.create("div", "", topRow);
@@ -516,7 +533,7 @@ const legend = (L as any).control({ position: "topright" });
 
     markersGroup.addTo(map);
     container.__zones_layer__ = markersGroup;
-  }, [zones, mode, mapReady, mapElementId, healthWindowDays]);
+  }, [zones, mode, mapReady, mapElementId, healthWindowDays, healthMetric]);
 
   /* ================= UI ================= */
   return (
