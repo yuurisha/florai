@@ -30,7 +30,7 @@ app.add_middleware(
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 DET_PATH = os.path.join(BASE_DIR, "leaf_detector_hibiscus_ft_v2.pt")
-CLF_PATH = os.path.join(BASE_DIR, "leaf_classifier_hibiscus_best.pth")
+CLF_PATH = os.path.join(BASE_DIR, "leaf_classifier_hibiscus_binary_stratified_v1.pth")
 
 
 # --------------------
