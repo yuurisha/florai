@@ -5,11 +5,7 @@ from PIL import Image
 import io
 import os
 import numpy as np
-
-import torch
-import torch.nn.functional as F
-from torchvision import transforms
-import timm
+import onnxruntime as ort
 
 # --------------------
 # App init
@@ -25,69 +21,62 @@ app.add_middleware(
 )
 
 # --------------------
-# Paths
+# Paths (Updated to ONNX)
 # --------------------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-DET_PATH = os.path.join(BASE_DIR, "leaf_detector_hibiscus_ft_v2.pt")
-CLF_PATH = os.path.join(BASE_DIR, "leaf_classifier_hibiscus_binary_stratified_v1.pth")
-
+DET_PATH = os.path.join(BASE_DIR, "leaf_detector_hibiscus_ft_v2.onnx")
+CLF_PATH = os.path.join(BASE_DIR, "leaf_classifier.onnx")
 
 # --------------------
 # Load models ONCE
 # --------------------
-device = "cuda" if torch.cuda.is_available() else "cpu"
-
-# YOLO detector
+# YOLO handles ONNX natively via ultralytics
 detector = YOLO(DET_PATH)
 DET_CONF = 0.35
 MIN_BOX_SIZE = 12
 MIN_CLASS_CONF = 0.6
 
-# EfficientNet classifier
-classifier = timm.create_model(
-    "efficientnet_b0",
-    pretrained=False,
-    num_classes=2
-)
-classifier.load_state_dict(torch.load(CLF_PATH, map_location=device))
-classifier = classifier.to(device).eval()
+# ONNX Runtime session for the classifier
+clf_session = ort.InferenceSession(CLF_PATH, providers=['CPUExecutionProvider'])
 
 IDX_TO_LABEL = {1: "diseased", 0: "healthy"}
-clf_tfms = transforms.Compose([
-    transforms.Resize((224, 224)),
-    transforms.ToTensor(),
-    transforms.Normalize(
-        mean=[0.485, 0.456, 0.406],
-        std=[0.229, 0.224, 0.225]
-    ),
-])
 
 # --------------------
 # Helper functions
 # --------------------
 def classify_leaf(pil_img):
-    x = clf_tfms(pil_img).unsqueeze(0).to(device)
-    with torch.no_grad():
-        logits = classifier(x)
-        probs = F.softmax(logits, dim=1)[0].cpu().numpy()
+    """Replaces your torch transforms with manual numpy preprocessing"""
+    # 1. Resize (Matches your original transforms.Resize)
+    img = pil_img.resize((224, 224))
+    
+    # 2. ToTensor & Normalize (Matches your original transforms.Normalize)
+    # Explicitly set dtype to np.float32
+    img_data = np.array(img).transpose(2, 0, 1).astype(np.float32) / 255.0
+    
+    # Force mean and std to be float32 to prevent promotion to double
+    mean = np.array([0.485, 0.456, 0.406], dtype=np.float32).reshape(3, 1, 1)
+    std = np.array([0.229, 0.224, 0.225], dtype=np.float32).reshape(3, 1, 1)
+    
+    img_data = (img_data - mean) / std
+    
+    # Final safety check: ensure input_tensor is float32
+    input_tensor = img_data[np.newaxis, :].astype(np.float32)
+
+    # 3. Run Inference
+    outputs = clf_session.run(None, {clf_session.get_inputs()[0].name: input_tensor})
+    logits = outputs[0]
+    
+    # 4. Softmax & Argmax (Matches your original torch logic)
+    probs = np.exp(logits) / np.sum(np.exp(logits), axis=1)
     idx = int(np.argmax(probs))
-    return IDX_TO_LABEL[idx], float(probs[idx])
+    return IDX_TO_LABEL[idx], float(probs[0][idx])
 
-
+# Note: Keeping your metrics helpers exactly the same!
 def compute_metrics(healthy: int, diseased: int):
-    """
-    Computes Health Ratio and Disease Incidence using ONLY counted leaves
-    (healthy + diseased). Uncertain is excluded.
-    """
     counted = healthy + diseased
     if counted == 0:
-        return {
-            "counted": 0,
-            "health_ratio": None,
-            "disease_incidence": None,
-        }
-
+        return {"counted": 0, "health_ratio": None, "disease_incidence": None}
     health_ratio = healthy / counted
     disease_incidence = diseased / counted
     return {
@@ -96,25 +85,13 @@ def compute_metrics(healthy: int, diseased: int):
         "disease_incidence": float(disease_incidence),
     }
 
-
-def photo_health_level_from_incidence(disease_incidence: float | None, counted: int):
-    if counted == 0 or disease_incidence is None:
-        return "Unknown"
-
-    if disease_incidence <= 0.20:
-        return "Healthy"
-    if disease_incidence <= 0.40:
-        return "Moderate"
-    return "Unhealthy"
-
-
 # --------------------
 # Routes
 # --------------------
 @app.get("/")
 def root():
     return {
-        "message": "FLORAI FastAPI running",
+        "message": "FLORAI FastAPI running (ONNX Optimized)",
         "detector": os.path.basename(DET_PATH),
         "classifier": os.path.basename(CLF_PATH),
         "conf": DET_CONF,
@@ -129,42 +106,26 @@ async def predict(file: UploadFile = File(...)):
     image_bytes = await file.read()
     img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
 
+    # Using YOLO ONNX
     results = detector.predict(img, conf=DET_CONF, verbose=False)[0]
 
-    healthy = 0
-    diseased = 0
-    uncertain = 0
+    healthy, diseased, uncertain = 0, 0, 0
     detections = []
 
-    # --- STATE A: No leaf detected by YOLO at all ---
+    # --- STATE A: No leaf detected ---
     if results.boxes is None or len(results.boxes) == 0:
         return {
             "status": "NoLeafDetected",
             "message": "No leaf detected. Please try again with a clearer photo (closer leaf, better lighting).",
-            "summary": {
-                "healthy": 0,
-                "diseased": 0,
-                "uncertain": 0,
-                "total_counted": 0,
-                "total_all": 0,
-            },
-            "metrics": {
-                "health_ratio": None,
-                "disease_incidence": None,
-            },
+            "summary": {"healthy": 0, "diseased": 0, "uncertain": 0, "total_counted": 0, "total_all": 0},
+            "metrics": {"health_ratio": None, "disease_incidence": None},
             "detections": [],
         }
 
- 
-    for i, box in enumerate(results.boxes):
+    for box in results.boxes:
         x1, y1, x2, y2 = box.xyxy[0].cpu().numpy().tolist()
         det_conf = float(box.conf[0])
 
-        # (Optional extra safety)
-        # if det_conf < DET_CONF:
-        #     continue
-
-        # filter tiny noise
         if (x2 - x1) < MIN_BOX_SIZE or (y2 - y1) < MIN_BOX_SIZE:
             continue
 
@@ -173,15 +134,11 @@ async def predict(file: UploadFile = File(...)):
 
         final_label = label
         if cls_conf >= MIN_CLASS_CONF:
-            if label == "healthy":
-                healthy += 1
-            else:
-                diseased += 1
+            if label == "healthy": healthy += 1
+            else: diseased += 1
         else:
             final_label = "uncertain"
             uncertain += 1
-
-       
 
         detections.append({
             "bbox": [x1, y1, x2, y2],
@@ -190,42 +147,28 @@ async def predict(file: UploadFile = File(...)):
             "leaf_conf": cls_conf,
         })
 
-    # --- STATE B: YOLO found boxes, but after filtering they are all unusable ---
+    # --- STATE B: Filtering usable boxes ---
     if len(detections) == 0:
         return {
             "status": "LeafNotClear",
             "message": "Leaf was detected but the regions were too small/unclear to classify. Try a closer photo.",
-            "summary": {
-                "healthy": 0,
-                "diseased": 0,
-                "uncertain": 0,
-                "total_counted": 0,
-                "total_all": 0,
-            },
-            "metrics": {
-                "health_ratio": None,
-                "disease_incidence": None,
-            },
+            "summary": {"healthy": 0, "diseased": 0, "uncertain": 0, "total_counted": 0, "total_all": 0},
+            "metrics": {"health_ratio": None, "disease_incidence": None},
             "detections": [],
         }
 
-    # --- STATE C: We have usable detections -> compute incidence/ratio ---
-    counted = healthy + diseased
-    if counted == 0:
-        health_ratio = None
-        disease_incidence = None
-        final_status = "Unknown"  # only uncertain
-    else:
-        health_ratio = healthy / counted
-        disease_incidence = diseased / counted
+    # --- STATE C: Compute incidence/ratio (Your exact logic) ---
+    metrics = compute_metrics(healthy, diseased)
+    counted = metrics["counted"]
+    health_ratio = metrics["health_ratio"]
+    disease_incidence = metrics["disease_incidence"]
 
-        # thresholds using disease incidence
-        if disease_incidence <= 0.20:
-            final_status = "Healthy"
-        elif disease_incidence <= 0.50:
-            final_status = "Moderate"
-        else:
-            final_status = "Unhealthy"
+    if counted == 0:
+        final_status = "Unknown"
+    else:
+        if disease_incidence <= 0.20: final_status = "Healthy"
+        elif disease_incidence <= 0.50: final_status = "Moderate"
+        else: final_status = "Unhealthy"
 
     return {
         "status": final_status,
@@ -234,12 +177,9 @@ async def predict(file: UploadFile = File(...)):
             "healthy": healthy,
             "diseased": diseased,
             "uncertain": uncertain,
-            "total_counted": counted,        # healthy+diseased only
-            "total_all": len(detections),    # includes uncertain
+            "total_counted": counted,
+            "total_all": len(detections),
         },
-        "metrics": {
-            "health_ratio": None if health_ratio is None else float(health_ratio),
-            "disease_incidence": None if disease_incidence is None else float(disease_incidence),
-        },
+        "metrics": metrics,
         "detections": detections,
     }
