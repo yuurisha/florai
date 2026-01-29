@@ -94,7 +94,7 @@ export default function MapViewer({
   const [heatPoints, setHeatPoints] = useState<[number, number, number][]>([]);
   const clickLocked = useRef(false);
 
-  const apiKey = process.env.NEXT_PUBLIC_OPENWEATHER_API_KEY || "";
+  const apiKey = "2bf9dfdb74441da8e8cc8fb887d2ceec";
 
   // Debounce clicks to prevent spamming predictions
   function debounceClick(callback: () => void, delay = 800) {
