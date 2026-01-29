@@ -80,8 +80,7 @@ const HeatmapLayer = ({ points }: { points: [number, number, number][] }) => {
 const MapViewer = ({ setWeather, setSpreadDetails }: MapViewerProps) => {
   const [heatPoints, setHeatPoints] = useState<[number, number, number][]>([]);
 
-  const apiKey = process.env.NEXT_PUBLIC_OPENWEATHER_KEY ?? "";
-
+  const apiKey = ; // Your OpenWeather API Key
 
   // Handles click events to fetch weather + model prediction and update state
   const handleMapClick = async (e: any) => {
