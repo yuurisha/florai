@@ -33,10 +33,18 @@ export async function getUserStats(uid: string): Promise<UserStats> {
   }
 
   const data = snap.data() as any;
+  const storedCurrent = data.currentStreak ?? 0;
+  const lastActionDate = data.lastActionDate ?? null;
+  const today = isoToday();
+  const yesterday = isoYesterday();
+
+  const currentStreak =
+    lastActionDate === today || lastActionDate === yesterday ? storedCurrent : 0;
+
   return {
-    currentStreak: data.currentStreak ?? 0,
+    currentStreak,
     longestStreak: data.longestStreak ?? 0,
-    lastActionDate: data.lastActionDate ?? null,
+    lastActionDate,
     badges: data.badges ?? {},
   };
 }

@@ -57,13 +57,27 @@ export default function LoginPage() {
       // Store token in cookie (for middleware)
       document.cookie = `firebaseToken=${token}; path=/; SameSite=Lax;`;
 
-      // Get role with graceful fallback
-      let role = "user";
+      // Check if user document exists in Firestore
+      let role: string | null = "user";
       try {
-        role = (await getUserRole()) || "user";
+        role = (await getUserRole()) || null;
+        
+        // If no role found, user document doesn't exist
+        if (!role) {
+          // Sign out the user
+          await auth.signOut();
+          document.cookie = "firebaseToken=; Max-Age=0; path=/; SameSite=Lax";
+          document.cookie = "userRole=; Max-Age=0; path=/; SameSite=Lax";
+          toast.error("Account not found. Please contact support.");
+          return;
+        }
       } catch (err) {
-        console.warn("Failed to load role. Defaulting to user.");
-        toast("Logged in, but failed to load role.", { icon: "ℹ️" });
+        // If error checking user document, sign out
+        await auth.signOut();
+        document.cookie = "firebaseToken=; Max-Age=0; path=/; SameSite=Lax";
+        document.cookie = "userRole=; Max-Age=0; path=/; SameSite=Lax";
+        toast.error("Account verification failed. Please contact support.");
+        return;
       }
 
       document.cookie = `userRole=${role}; path=/; SameSite=Lax;`;

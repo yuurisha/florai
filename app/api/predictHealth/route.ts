@@ -4,7 +4,6 @@ export const runtime = "nodejs";
 
 type HealthLevel = "Healthy" | "Moderate" | "Unhealthy" | "Unknown";
 
-// ✅ Set this in Vercel Environment Variables:
 // FASTAPI_BASE_URL = https://florai-0o6p.onrender.com
 const FASTAPI_BASE_URL = process.env.FASTAPI_BASE_URL;
 
@@ -95,7 +94,7 @@ export async function POST(req: Request) {
     const diseased = Number(data?.summary?.diseased ?? 0);
     const total = healthy + diseased;
 
-    // ---- Compute photo health score (incidence-style proxy) ----
+    
     // Laplace smoothing to avoid 0%/100% when total is small
     const alpha = 1;
     const photoHealth = total > 0 ? (healthy + alpha) / (total + 2 * alpha) : null;

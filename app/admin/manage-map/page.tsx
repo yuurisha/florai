@@ -41,6 +41,7 @@ export default function Page() {
   const [pendingPhotoFile, setPendingPhotoFile] = useState<File | null>(null);
   const [pendingPhotoUrl, setPendingPhotoUrl] = useState<string | null>(null);
   const [healthWindowDays, setHealthWindowDays] = useState<1 | 30>(30);
+  const [healthMetric, setHealthMetric] = useState<"uploads" | "leaves">("uploads");
   const [analyticsStart, setAnalyticsStart] = useState<string>("");
   const [analyticsEnd, setAnalyticsEnd] = useState<string>("");
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
@@ -72,6 +73,21 @@ export default function Page() {
   };
 
   const getWindowStats = (zone: GreenSpace) => {
+    if (healthMetric === "leaves") {
+      if (healthWindowDays === 1) {
+        return {
+          total: zone.totalLeaves5 ?? 0,
+          healthy: zone.healthyLeaves5 ?? 0,
+          healthIndex: zone.leafHealthIndex5 ?? null,
+        };
+      }
+      return {
+        total: zone.totalLeaves ?? 0,
+        healthy: zone.healthyLeaves ?? 0,
+        healthIndex: zone.leafHealthIndex ?? null,
+      };
+    }
+
     if (healthWindowDays === 1) {
       return {
         total: zone.totalUploads5 ?? 0,
@@ -217,8 +233,10 @@ export default function Page() {
     (async () => {
       try {
         const zones = await fetchGreenSpaces();
-        const missing = zones.filter(
-          (zone) => zone.totalUploads5 == null || zone.healthIndex5 === undefined
+        const missing = zones.filter((zone) =>
+          healthMetric === "leaves"
+            ? zone.totalLeaves5 == null || zone.leafHealthIndex5 === undefined
+            : zone.totalUploads5 == null || zone.healthIndex5 === undefined
         );
         if (missing.length === 0) return;
         await Promise.all(missing.map((zone) => updateGreenSpaceHealth(zone.id)));
@@ -238,7 +256,43 @@ export default function Page() {
     return () => {
       active = false;
     };
-  }, [healthWindowDays, selectedZone, analyticsStart, analyticsEnd, analyticsSort]);
+  }, [
+    healthWindowDays,
+    healthMetric,
+    selectedZone,
+    analyticsStart,
+    analyticsEnd,
+    analyticsSort,
+  ]);
+
+  useEffect(() => {
+    if (healthMetric !== "leaves") return;
+    let active = true;
+
+    (async () => {
+      try {
+        const zones = await fetchGreenSpaces();
+        const missing = zones.filter(
+          (zone) => zone.totalLeaves == null || zone.leafHealthIndex === undefined
+        );
+        if (missing.length === 0) return;
+        await Promise.all(missing.map((zone) => updateGreenSpaceHealth(zone.id)));
+        const refreshed = await fetchGreenSpaces();
+        if (!active) return;
+        if (selectedZone) {
+          const updated = refreshed.find((zone) => zone.id === selectedZone.id);
+          if (updated) setSelectedZone(updated);
+        }
+        setRefreshKey((v) => v + 1);
+      } catch (err) {
+        console.error("Failed to backfill leaf health stats:", err);
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [healthMetric, selectedZone]);
 
   useEffect(() => {
     let cancelled = false;
@@ -339,7 +393,36 @@ export default function Page() {
 
   const handleDeleteZone = async () => {
     if (!selectedZone) return;
-    const ok = window.confirm(`Delete "${selectedZone.name}"? This cannot be undone.`);
+    const ok = await new Promise<boolean>((resolve) => {
+      toast(
+        (t) => (
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-slate-800">
+              Delete "{selectedZone.name}"? This cannot be undone.
+            </span>
+            <button
+              className="rounded bg-red-600 px-2 py-1 text-xs font-semibold text-white hover:bg-red-700"
+              onClick={() => {
+                toast.dismiss(t.id);
+                resolve(true);
+              }}
+            >
+              Delete
+            </button>
+            <button
+              className="rounded bg-slate-200 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-300"
+              onClick={() => {
+                toast.dismiss(t.id);
+                resolve(false);
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        ),
+        { duration: Infinity }
+      );
+    });
     if (!ok) return;
     try {
       await deleteGreenSpace(selectedZone.id);
@@ -363,7 +446,7 @@ export default function Page() {
             <div className="flex h-full flex-col">
               <div className="flex items-center justify-between gap-2 border-b border-slate-200 px-4 py-2 text-xs">
                 <span className="font-semibold text-slate-600">Health window</span>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <button
                     type="button"
                     onClick={() => setHealthWindowDays(30)}
@@ -386,6 +469,29 @@ export default function Page() {
                   >
                     Daily
                   </button>
+                  <span className="ml-2 font-semibold text-slate-600">Metric</span>
+                  <button
+                    type="button"
+                    onClick={() => setHealthMetric("uploads")}
+                    className={`rounded-full border px-3 py-1 font-semibold ${
+                      healthMetric === "uploads"
+                        ? "border-emerald-600 bg-emerald-50 text-emerald-700"
+                        : "border-slate-300 text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    Uploads
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setHealthMetric("leaves")}
+                    className={`rounded-full border px-3 py-1 font-semibold ${
+                      healthMetric === "leaves"
+                        ? "border-emerald-600 bg-emerald-50 text-emerald-700"
+                        : "border-slate-300 text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    Leaves
+                  </button>
                 </div>
               </div>
               <div className="flex-1">
@@ -395,6 +501,7 @@ export default function Page() {
                   refreshKey={refreshKey}
                   mapId="admin-map"
                   healthWindowDays={healthWindowDays}
+                  healthMetric={healthMetric}
                 />
               </div>
             </div>
@@ -576,7 +683,8 @@ export default function Page() {
                         {selectedZone.name}
                       </p>
                       <p className="text-xs text-slate-500">
-                        Uploads ({getRollingWindowLabel(healthWindowDays)}):{" "}
+                        {healthMetric === "leaves" ? "Leaves" : "Uploads"} (
+                        {getRollingWindowLabel(healthWindowDays)}):{" "}
                         {getWindowStats(selectedZone).total}
                       </p>
                     </div>

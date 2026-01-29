@@ -22,9 +22,10 @@ export default function ConfirmDeleteModal({
   }, [onCancel]);
 
   return (
-    <div className="fixed inset-0 z-50 bg-black bg-opacity-40 flex items-center justify-center">
-      <div className="bg-white rounded-lg p-6 shadow-lg w-[90%] max-w-md">
-        <p className="text-gray-800 mb-4">{message}</p>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/10 backdrop-blur-sm" onClick={onCancel} />
+      <div className="relative bg-white rounded-lg p-6 shadow-xl w-[90%] max-w-md border border-gray-200">
+        <p className="text-gray-800 mb-4 whitespace-pre-line">{message}</p>
         <div className="flex justify-end gap-3">
           <button
             onClick={onCancel}

@@ -6,14 +6,12 @@ import SurveyTable from "@/components/SurveyTable";
 import { collection, getDocs, deleteDoc, updateDoc, doc, Timestamp, getCountFromServer, query, where } from "firebase/firestore"; 
 import { db } from "@/lib/firebaseConfig";
 import AdminTopNavBar from "@/components/adminTopNavBar";
-import Link from "next/link"; // ⭐ Make sure Link is imported for the Favorite List
+import Link from "next/link"; 
 import { createNotificationDoc } from "@/controller/notificationController";
 import toast from "react-hot-toast";
 
-// Define the possible views
 type SurveyView = "list" | "form";
 
-// Define the required interface for type safety (optional but highly recommended)
 interface Survey {
     id: string;
     title: string;
@@ -26,9 +24,6 @@ interface Survey {
     [key: string]: any; 
 }
 
-// ----------------------------------------------------------------------------
-
-
 export default function ManageSurveyPage() {
   const [surveys, setSurveys] = useState<Survey[]>([]);
   const [editingSurvey, setEditingSurvey] = useState<Survey | null>(null);
@@ -38,7 +33,7 @@ export default function ManageSurveyPage() {
   const [responseCounts, setResponseCounts] = useState<{ [key: string]: number }>({});
   const [isLoadingResponses, setIsLoadingResponses] = useState(false);
 
-  // Fetches the real count from Firebase
+  // Fetches from Firebase
   const getResponsesCount = async (surveyId: string): Promise<number> => {
     const q = query(collection(db, "responses"), where("surveyId", "==", surveyId));
     const snapshot = await getCountFromServer(q);
@@ -155,6 +150,37 @@ export default function ManageSurveyPage() {
   };
 
   const handleDelete = async (id: string) => {
+    const confirmed = await new Promise<boolean>((resolve) => {
+      toast(
+        (t) => (
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-gray-800">
+              Delete this survey? This cannot be undone.
+            </span>
+            <button
+              className="rounded bg-red-600 px-2 py-1 text-xs font-semibold text-white hover:bg-red-700"
+              onClick={() => {
+                toast.dismiss(t.id);
+                resolve(true);
+              }}
+            >
+              Delete
+            </button>
+            <button
+              className="rounded bg-gray-200 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-300"
+              onClick={() => {
+                toast.dismiss(t.id);
+                resolve(false);
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        ),
+        { duration: Infinity }
+      );
+    });
+    if (!confirmed) return;
     try {
       await deleteDoc(doc(db, "surveys", id));
       await loadSurveys();

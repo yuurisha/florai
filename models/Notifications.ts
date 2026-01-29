@@ -1,7 +1,7 @@
 import type { PredictionSummary } from "./Prediction";
 import type { ReportSummary } from "./Report";
 
-export type NotificationType = "ai_alert" | "user_report" | "survey";
+export type NotificationType = "ai_alert" | "user_report" | "um_special_alert";
 
 export interface Notification {
   _id: string;
@@ -19,7 +19,7 @@ export interface Notification {
   predictionID?: string;    // AI alerts (you must add this FK in DB)
   userID: string;           
   adminID?: string;
-   prediction?: PredictionSummary;  // for AI alerts
+  prediction?: PredictionSummary;  // for AI alerts
   report?: ReportSummary;          // for user reports
 
   // Derived from Prediction (if AI alert)

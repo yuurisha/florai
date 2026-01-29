@@ -48,7 +48,7 @@ export const saveDiaryEntry = async (
   existing: DiaryEntry | undefined,
   data: SaveDiaryData
 ) => {
-  if (date > todayISO()) {
+  if (date > todayISO()) { // error handling for future date
     throw new Error("Cannot create diary entries for future dates.");
   }
   if (existing) {

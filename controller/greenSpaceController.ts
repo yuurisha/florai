@@ -132,6 +132,7 @@ export const removeGreenSpacePhoto = async (greenSpaceId: string) => {
   await updateGreenSpaceMeta(greenSpaceId, { photoUrl: null });
 };
 
+// Update health metrics for a green space
 export async function updateGreenSpaceHealth(greenSpaceId: string) {
   const ref = doc(db, "greenSpaces", greenSpaceId);
   const now = new Date();

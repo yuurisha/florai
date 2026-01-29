@@ -232,7 +232,6 @@ export default function SurveyListPage() {
                       ) : (
                         <button
                           type="button"
-                          disabled
                           className="inline-flex items-center justify-center bg-gray-100 text-gray-500 px-5 py-2.5 rounded-lg text-sm font-medium cursor-not-allowed"
                           onClick={() => toast.success("Survey already submitted.")}
                         >

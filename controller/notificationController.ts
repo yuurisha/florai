@@ -40,55 +40,82 @@ export async function fetchUserNotifications(userID: string): Promise<Notificati
       channelInApp: true,
     };
 
-  // If user disabled all in-app notifications → return empty
-  if (!prefs.channelInApp) {
-    return [];
-  }
+// If user disabled all in-app notifications → return empty
+if (!prefs.enableAiAlerts || !prefs.channelInApp) {
+  return [];
+}
 
   const notifRef = collection(db, NOTIF_COLLECTION);
 
-  const q = query(
+  // Query 1: User-specific notifications
+  const userQuery = query(
     notifRef,
     where("userID", "==", userID),
     orderBy("createdAt", "desc")
   );
 
-  const snap = await getDocs(q);
+  // Query 2: UM special alerts (global notifications with userID = null)
+  const umQuery = query(
+    notifRef,
+    where("type", "==", "um_special_alert"),
+    orderBy("createdAt", "desc")
+  );
+
+  // Execute both queries
+  const [userSnap, umSnap] = await Promise.all([
+    getDocs(userQuery),
+    getDocs(umQuery)
+  ]);
+
+  // Combine both result sets
+  const allDocs = [...userSnap.docs, ...umSnap.docs];
+
   const results: Notification[] = [];
 
-  for (const d of snap.docs) {
+  // Collect all prediction and report IDs first
+  const predictionIDs = new Set<string>();
+  const reportIDs = new Set<string>();
+
+  for (const d of allDocs) {
+    const data = d.data();
+    if (data.predictionID) predictionIDs.add(data.predictionID);
+    if (data.reportID) reportIDs.add(data.reportID);
+  }
+
+  // Batch fetch all predictions and reports in parallel
+  const [predictionDocs, reportDocs] = await Promise.all([
+    Promise.all(
+      Array.from(predictionIDs).map(id => getDoc(doc(db, "predictions", id)))
+    ),
+    Promise.all(
+      Array.from(reportIDs).map(id => getDoc(doc(db, "reports", id)))
+    )
+  ]);
+
+  // Create lookup maps
+  const predictionMap = new Map<string, PredictionSummary>();
+  predictionDocs.forEach(snap => {
+    if (snap.exists()) {
+      predictionMap.set(snap.id, snap.data() as PredictionSummary);
+    }
+  });
+
+  const reportMap = new Map<string, ReportSummary>();
+  reportDocs.forEach(snap => {
+    if (snap.exists()) {
+      reportMap.set(snap.id, snap.data() as ReportSummary);
+    }
+  });
+
+  // Now build notifications using the maps
+  for (const d of allDocs) {
     const data = d.data();
 
-    /** -----------------------------
-     * JOIN PREDICTION (FIXED)
-     * ------------------------------ */
-    let prediction: PredictionSummary | undefined = undefined;
-
-    if (data.predictionID) {
-      const predSnap = await getDoc(doc(db, "predictions", data.predictionID));
-      if (predSnap.exists()) {
-        prediction = predSnap.data() as PredictionSummary; // FIXED
-      }
-    }
-
-    /** -----------------------------
-     * JOIN REPORT (FIXED)
-     * ------------------------------ */
-    let report: ReportSummary | undefined = undefined;
-
-    if (data.reportID) {
-      const repSnap = await getDoc(doc(db, "reports", data.reportID));
-      if (repSnap.exists()) {
-        report = repSnap.data() as ReportSummary; // FIXED
-      }
-    }
+    const prediction = data.predictionID ? predictionMap.get(data.predictionID) : undefined;
+    const report = data.reportID ? reportMap.get(data.reportID) : undefined;
 
     // Skip if notification itself is muted
     if (data.receiveNotifications === false) {
-      continue;
-    }
-
-    if (data.type === "ai_alert" && prefs.enableAiAlerts === false) {
       continue;
     }
 
@@ -122,6 +149,16 @@ if (data.type === "ai_alert" && data.predictedRisk) {
 
       prediction, // typed
       report,
+      
+      // Include prediction fields directly on notification
+      latitude: data.latitude ?? prediction?.latitude,
+      longitude: data.longitude ?? prediction?.longitude,
+      temperature: data.temperature ?? prediction?.temperature,
+      rainfall: data.rainfall ?? prediction?.rainfall,
+      humidity: data.humidity ?? prediction?.humidity,
+      predictedSpread: data.predictedSpread ?? prediction?.predictedSpread,
+      predictedRisk: data.predictedRisk ?? prediction?.predictedRisk,
+      
       _id: ""
     });
   }
@@ -133,7 +170,7 @@ if (data.type === "ai_alert" && data.predictedRisk) {
  * CREATE NOTIFICATION
  * ------------------------------ */
 export async function createNotificationDoc(payload: {
-  type: "ai_alert" | "user_report" | "survey";
+  type: "ai_alert" | "survey" | "user_report";
   description: string;
   userID: string;
   adminID?: string;
@@ -177,7 +214,7 @@ export async function markAllNotificationsRead(userID: string) {
 }
 
 /** -----------------------------
- * admin notification
+ * admin notification if any report is submitted by user
  * ------------------------------ */
 export async function fetchAdminReportNotifications(adminUid: string): Promise<Notification[]> {
   const notifRef = collection(db, "notifications");

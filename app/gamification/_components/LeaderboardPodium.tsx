@@ -7,7 +7,7 @@ export default function LeaderboardPodium({
 }) {
   const [first, second, third] = top3;
 
-  // layout: 2nd - 1st - 3rd (kahoot-ish)
+
   const items = [
     { rank: 2, user: second, tall: false },
     { rank: 1, user: first, tall: true },

@@ -21,27 +21,22 @@ declare module "leaflet" {
 }
 
 interface MapViewerProps {
-  setWeather: React.Dispatch<
-    React.SetStateAction<{
-      temperature: string;
-      humidity: string;
-      rainfall: string;
-    }>
-  >;
-  setSpreadDetails: React.Dispatch<
-    React.SetStateAction<{
-      riskLevel: string;
-      spreadDistance: string;
-    }>
-  >;
-  setLocation: React.Dispatch<
-    React.SetStateAction<{
-      latitude: string;
-      longitude: string;
-    }>
-  >;
-  setIsLoading: (value: boolean) => void;
-  setRetryFn: (fn: null | (() => void)) => void;
+  setWeather: React.Dispatch<React.SetStateAction<{
+    temperature: string;
+    humidity: string;
+    rainfall: string;
+  }>>;
+  setSpreadDetails: React.Dispatch<React.SetStateAction<{
+    riskLevel: string;
+    spreadDistance: string;
+  }>>;
+  setLocation: React.Dispatch<React.SetStateAction<{
+    latitude: string;
+    longitude: string;
+  }>>;
+  setIsLoading: React.Dispatch<React.SetStateAction<boolean>>;
+  setRetryFn: React.Dispatch<React.SetStateAction<null | (() => void)>>;
+  setError: React.Dispatch<React.SetStateAction<string | null>>;
 }
 
 const ClickHandler = ({ onMapClick }: { onMapClick: (e: any) => void }) => {
@@ -60,14 +55,14 @@ const HeatmapLayer = ({ points }: { points: [number, number, number][] }) => {
       blur: 20,
       maxZoom: 17,
       minOpacity: 0.4,
+      max: 1.0,  // Set explicit max value
       gradient: {
-      0.0: "green",
-      0.33: "green",
-      0.34: "orange",
-      0.66: "orange",
-      0.67: "red",
-      1.0: "red",
-    },
+        0.0: "green",
+        0.4: "yellow",
+        0.6: "orange",
+        0.8: "red",
+        1.0: "darkred",
+      },
     }).addTo(map);
 
     return () => {
@@ -88,17 +83,18 @@ function toDMS(dec: number): string {
   return `${deg}° ${min}' ${sec}"`;
 }
 
-const MapViewer = ({
+export default function MapViewer({
   setWeather,
   setSpreadDetails,
   setLocation,
   setIsLoading,
   setRetryFn,
-}: MapViewerProps) => {
+  setError
+}: MapViewerProps) {
   const [heatPoints, setHeatPoints] = useState<[number, number, number][]>([]);
   const clickLocked = useRef(false);
 
-  const apiKey = process.env.OPENWEATHER_API_KEY;
+  const apiKey = process.env.NEXT_PUBLIC_OPENWEATHER_API_KEY || "";
 
   // Debounce clicks to prevent spamming predictions
   function debounceClick(callback: () => void, delay = 800) {
@@ -200,9 +196,9 @@ const MapViewer = ({
             }
 
             function riskToIntensity(risk: string) {
-              if (risk === "High") return 0.85;
-              if (risk === "Medium") return 0.55;
-              return 0.25; // Low (default)
+              if (risk === "High") return 0.9;
+              if (risk === "Medium") return 0.5;
+              return 0.2; // Low (default)
             }
 
             // Heatmap intensity
@@ -247,5 +243,3 @@ const MapViewer = ({
     </MapContainer>
   );
 };
-
-export default MapViewer;

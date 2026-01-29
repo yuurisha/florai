@@ -14,7 +14,7 @@ export default function ViewResponsesPage() {
   const [survey, setSurvey] = useState<any | null>(null);
   const [responses, setResponses] = useState<any[]>([]);
 
-  // Fetch survey info (to get questions)
+  // Fetch survey info 
   const fetchSurvey = async () => {
     const ref = doc(db, "surveys", id as string);
     const snap = await getDoc(ref);

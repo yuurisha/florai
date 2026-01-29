@@ -12,7 +12,7 @@ import { Label } from "./label"
 import { Button } from "./button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./select"
 
-import { createEvent } from "../controller/eventController"
+import { createEvent, fetchAllEventsAdmin } from "../controller/eventController"
 import type { Event } from "../models/Event"
 
 export function AddEventForm() {
@@ -45,6 +45,26 @@ export function AddEventForm() {
     setIsSubmitting(true)
 
     try {
+      // Check for duplicate events
+      const existingEvents = await fetchAllEventsAdmin()
+      
+      const duplicate = existingEvents.find((event) => {
+        const isSameTitle = event.title.toLowerCase().trim() === formData.title.toLowerCase().trim()
+        const isSameDate = event.date === formData.date
+        const isSameLocation = event.location.toLowerCase().trim() === formData.location.toLowerCase().trim()
+        
+        return isSameTitle && isSameDate && isSameLocation
+      })
+
+      if (duplicate) {
+        toast.error(
+          `An event with the same title, date, and location already exists. Please check the event "${duplicate.title}" on ${duplicate.date}.`,
+          { duration: 5000 }
+        )
+        setIsSubmitting(false)
+        return
+      }
+
       await createEvent({
         title: formData.title,
         description: formData.description,

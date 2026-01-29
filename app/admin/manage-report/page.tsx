@@ -9,7 +9,6 @@ import { fetchReportsAdmin, updateReportStatus } from "@/controller/reportContro
 import type { Report, ReportStatus } from "@/models/Report";
 import AdminTopNavbar from "@/components/adminTopNavBar";
 import toast from "react-hot-toast";
-import {adminDeleteForumPost } from "@/controller/moderationController";
 
 const MANAGE_USER_ROUTE = "/admin/manage-user"; 
 
@@ -304,18 +303,14 @@ export default function AdminReportsPage() {
                             </Link>
                             )}
 
-                            {/* DELETE FORUM POST */}
+                            {/* VIEW FORUM POST */}
                             {r.targetType === "forum" && (
-                            <button
-                                className="border rounded px-2 py-1 border-red-600 text-red-700"
-                                onClick={async () => {
-                                if (!confirm("Delete this forum post? This cannot be undone.")) return;
-                                await adminDeleteForumPost(r.targetId, r.reportID);
-                                await load();
-                                }}
+                            <Link
+                                className="px-3 py-1.5 text-xs font-medium border border-red-300 text-red-700 rounded-md hover:bg-red-50 transition-colors"
+                                href={`/admin/manage-post/${encodeURIComponent(r.targetId)}`}
                             >
-                                Delete Post
-                            </button>
+                                View Post
+                            </Link>
                             )}
                           </div>
                         </td>

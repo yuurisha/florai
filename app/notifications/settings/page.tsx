@@ -22,37 +22,6 @@ export default function NotificationSettingsPage() {
           Notification Settings
         </h1>
       <div className="space-y-6 bg-white p-4 rounded-xl shadow-sm border text-sm">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="font-medium text-gray-800">Enable AI alerts</div>
-            <div className="text-xs text-gray-500">
-              Receive notifications when AI detects potential risks.
-            </div>
-          </div>
-          <input
-            type="checkbox"
-            checked={preferences.enableAiAlerts}
-            onChange={(e) =>
-              handleChange({ enableAiAlerts: e.target.checked })
-            }
-          />
-        </div>
-
-        <div>
-          <div className="font-medium text-gray-800 mb-1">Minimum severity</div>
-          <select
-            className="border rounded-md px-2 py-1 text-sm"
-            value={preferences.minSeverity}
-            onChange={(e) =>
-              handleChange({ minSeverity: e.target.value as any })
-            }
-          >
-            <option value="low">Low and above</option>
-            <option value="medium">Medium and above</option>
-            <option value="high">High only</option>
-          </select>
-        </div>
-
         <div>
           <div className="font-medium text-gray-800 mb-1">Delivery channels</div>
           <div className="flex items-center gap-4 text-xs">
@@ -66,32 +35,7 @@ export default function NotificationSettingsPage() {
               />
               In-app
             </label>
-            <label className="flex items-center gap-1">
-              <input
-                type="checkbox"
-                checked={preferences.channelEmail}
-                onChange={(e) =>
-                  handleChange({ channelEmail: e.target.checked })
-                }
-              />
-              Email
-            </label>
           </div>
-        </div>
-
-        <div>
-          <div className="font-medium text-gray-800 mb-1">Frequency</div>
-          <select
-            className="border rounded-md px-2 py-1 text-sm"
-            value={preferences.frequency}
-            onChange={(e) =>
-              handleChange({ frequency: e.target.value as any })
-            }
-          >
-            <option value="realtime">Real-time</option>
-            <option value="daily">Daily summary</option>
-            <option value="weekly">Weekly summary</option>
-          </select>
         </div>
       </div>
     </div>

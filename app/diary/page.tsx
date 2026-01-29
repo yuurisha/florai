@@ -30,7 +30,7 @@ function todayISO() {
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
 }
-
+//set date for block future access error handling
 function isFutureISODate(iso: string) {
   // iso is "YYYY-MM-DD"
   const today = todayISO();
@@ -183,6 +183,37 @@ export default function DiaryPage() {
 
   const handleDelete = async (id: string) => {
     if (!userId) return;
+    const confirmed = await new Promise<boolean>((resolve) => {
+      toast(
+        (t) => (
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-gray-800">
+              Delete this diary entry? This cannot be undone.
+            </span>
+            <button
+              className="rounded bg-red-600 px-2 py-1 text-xs font-semibold text-white hover:bg-red-700"
+              onClick={() => {
+                toast.dismiss(t.id);
+                resolve(true);
+              }}
+            >
+              Delete
+            </button>
+            <button
+              className="rounded bg-gray-200 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-300"
+              onClick={() => {
+                toast.dismiss(t.id);
+                resolve(false);
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        ),
+        { duration: Infinity }
+      );
+    });
+    if (!confirmed) return;
 
     try {
       await deleteDiaryEntry(id);

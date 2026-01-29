@@ -221,12 +221,6 @@ console.log("CredentialsForm import:", CredentialsForm);
 
 export default function ProfilePage() {
   const [activeTab, setActiveTab] = useState("profile");
-  const title =
-    activeTab === "profile"
-      ? "Personal Information"
-      : activeTab === "credentials"
-        ? "Security Settings"
-        : "Badges";
 
   return (   
       <div className="min-h-screen bg-gray-100">
@@ -238,7 +232,11 @@ export default function ProfilePage() {
         <main className="flex-1 p-8">
           <div className="max-w-3xl mx-auto bg-white p-6 rounded-lg shadow">
             <h1 className="text-2xl font-bold text-green-700 mb-6">
-              {title}
+              {activeTab === "profile"
+                ? "Personal Information"
+                : activeTab === "credentials"
+                ? "Security Settings"
+                : "Badge Selector"}
             </h1>
 
             {activeTab === "profile" && <ProfileForm />}

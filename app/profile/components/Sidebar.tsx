@@ -1,5 +1,5 @@
 "use client";
-import { Settings, User, KeyRound, LogOut, Medal } from "lucide-react";
+import { Settings, User, KeyRound, LogOut, Award } from "lucide-react";
 import { Button } from "../../../components/button";
 import { signOut } from "firebase/auth";
 import { auth } from "../../../lib/firebaseConfig";
@@ -18,6 +18,14 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
   const handleLogout = async () => {
     try {
       await signOut(auth); // ✅ Firebase sign-out
+      
+      // Clear all cookies
+      document.cookie = "firebaseToken=; Max-Age=0; path=/; SameSite=Lax";
+      document.cookie = "userRole=; Max-Age=0; path=/; SameSite=Lax";
+      
+      // Clear localStorage
+      localStorage.clear();
+      
       router.push("/login"); // ✅ Redirect user to login page
     } catch (error) {
       console.error("Logout failed:", error);
@@ -57,7 +65,7 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
             className={`flex items-center gap-2 w-full px-3 py-2 rounded transition 
               ${activeTab === "badges" ? "bg-green-50 text-green-700 font-semibold" : "hover:bg-gray-100 hover:text-green-700"}`}
           >
-            <Medal className="w-4 h-4" /> Badges
+            <Award className="w-4 h-4" /> Badge Selector
           </button>
         </li>
 

@@ -40,13 +40,16 @@ def run_um_prediction_job():
         logging.info(f"DEBUG spread value = {spread} | type = {type(spread)}")
         logging.info(f"Prediction complete | risk={risk} | spread_distance_km={spread[0]} | spread_direction_deg={spread[1]}")
 
-        if risk == 0: # Low risk
-            create_um_special_alert(
-                prediction_id=prediction_id,
-                lat=lat,
-                lon=lon,
-                risk="Low",
-                spread={"spread_distance_km": spread[0], "spread_direction_deg": spread[1]}
-            )
-            logging.info(f"UM special alert created for LOW risk prediction triggered at lat={lat}, lon={lon}")
+        # Map risk value to risk label
+        risk_labels = {0: "Low", 1: "Medium", 2: "High"}
+        risk_label = risk_labels.get(risk, "Unknown")
+        
+        create_um_special_alert(
+            prediction_id=prediction_id,
+            lat=lat,
+            lon=lon,
+            risk=risk_label,
+            spread={"spread_distance_km": spread[0], "spread_direction_deg": spread[1]}
+        )
+        logging.info(f"UM special alert created for {risk_label} risk prediction triggered at lat={lat}, lon={lon}")
            

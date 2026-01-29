@@ -4,6 +4,7 @@ export interface Reply {
   name: string;
   text: string;
   timestamp: string;
+  avatarUrl?: string;
   userId?: string;
   badgeKey?: BadgeKey | null;
 }
@@ -20,4 +21,6 @@ export interface Post {
   views?: number;
   likes?: number;
   replies?: Reply[];
+  createdAt?: any;
+
 }

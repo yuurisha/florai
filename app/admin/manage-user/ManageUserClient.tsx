@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import AdminTopNavbar from "@/components/adminTopNavBar";
+import ConfirmDeleteModal from "@/components/ConfirmDeleteModal";
 import { getUserRole, adminRemoveUser } from "@/controller/userController";
 import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
@@ -214,44 +215,15 @@ useEffect(() => {
       </div>
 
       {/* Confirm Modal */}
-      {confirmOpen && (
-        <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-md rounded-lg bg-white shadow-lg border">
-            <div className="p-5">
-              <h2 className="text-lg font-bold text-gray-900">Remove this user?</h2>
-              <p className="mt-2 text-sm text-gray-600">
-                This will delete the user profile record from database and log the action.
-              </p>
-
-              <div className="mt-3 rounded-md border bg-gray-50 p-3 text-sm">
-                <div className="font-semibold text-gray-900"> 
-                  {selectedUser?.email ?? selectedUser?.name ?? selectedUser?.fullName ?? "User"}
-                </div>
-                <div className="text-xs text-gray-600 break-all">{selectedUser?.id}</div>
-              </div>
-
-              <div className="mt-5 flex items-center justify-end gap-2">
-                <button
-                  onClick={() => {
-                    setConfirmOpen(false);
-                    setSelectedUser(null);
-                  }}
-                  disabled={!!removingId}
-                  className="rounded-md px-4 py-2 text-sm font-semibold border bg-white hover:bg-gray-50 disabled:opacity-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleConfirmRemove}
-                  disabled={!!removingId}
-                  className="rounded-md px-4 py-2 text-sm font-semibold bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
-                >
-                  {removingId ? "Removing..." : "Remove"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+      {confirmOpen && selectedUser && (
+        <ConfirmDeleteModal
+          message={`Are you sure you want to remove this user?\n\n${selectedUser.email ?? selectedUser.name ?? selectedUser.fullName ?? "User"}\n${selectedUser.id}\n\nThis will delete the user profile record from database and log the action.`}
+          onConfirm={handleConfirmRemove}
+          onCancel={() => {
+            setConfirmOpen(false);
+            setSelectedUser(null);
+          }}
+        />
       )}
     </div>
   );

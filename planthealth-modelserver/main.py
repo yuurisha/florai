@@ -30,7 +30,8 @@ app.add_middleware(
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 DET_PATH = os.path.join(BASE_DIR, "leaf_detector_hibiscus_ft_v2.pt")
-CLF_PATH = os.path.join(BASE_DIR, "leaf_classifier_hibiscus_binary_stratified_v1.pth")
+CLF_PATH = os.path.join(BASE_DIR, "leaf_classifier_hibiscus_best.pth")
+
 
 # --------------------
 # Load models ONCE
@@ -40,6 +41,8 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 # YOLO detector
 detector = YOLO(DET_PATH)
 DET_CONF = 0.35
+MIN_BOX_SIZE = 12
+MIN_CLASS_CONF = 0.6
 
 # EfficientNet classifier
 classifier = timm.create_model(
@@ -50,8 +53,7 @@ classifier = timm.create_model(
 classifier.load_state_dict(torch.load(CLF_PATH, map_location=device))
 classifier = classifier.to(device).eval()
 
-IDX_TO_LABEL = {0: "healthy", 1: "diseased"}
-
+IDX_TO_LABEL = {1: "diseased", 0: "healthy"}
 clf_tfms = transforms.Compose([
     transforms.Resize((224, 224)),
     transforms.ToTensor(),
@@ -99,7 +101,6 @@ def photo_health_level_from_incidence(disease_incidence: float | None, counted: 
     if counted == 0 or disease_incidence is None:
         return "Unknown"
 
-    # ✅ tweak these thresholds to your preference
     if disease_incidence <= 0.20:
         return "Healthy"
     if disease_incidence <= 0.40:
@@ -154,8 +155,8 @@ async def predict(file: UploadFile = File(...)):
             "detections": [],
         }
 
-    # If boxes exist, process them
-    for box in results.boxes:
+ 
+    for i, box in enumerate(results.boxes):
         x1, y1, x2, y2 = box.xyxy[0].cpu().numpy().tolist()
         det_conf = float(box.conf[0])
 
@@ -164,14 +165,14 @@ async def predict(file: UploadFile = File(...)):
         #     continue
 
         # filter tiny noise
-        if (x2 - x1) < 20 or (y2 - y1) < 20:
+        if (x2 - x1) < MIN_BOX_SIZE or (y2 - y1) < MIN_BOX_SIZE:
             continue
 
         crop = img.crop((x1, y1, x2, y2))
         label, cls_conf = classify_leaf(crop)
 
         final_label = label
-        if cls_conf >= 0.75:
+        if cls_conf >= MIN_CLASS_CONF:
             if label == "healthy":
                 healthy += 1
             else:
@@ -179,6 +180,8 @@ async def predict(file: UploadFile = File(...)):
         else:
             final_label = "uncertain"
             uncertain += 1
+
+       
 
         detections.append({
             "bbox": [x1, y1, x2, y2],
@@ -219,7 +222,7 @@ async def predict(file: UploadFile = File(...)):
         # thresholds using disease incidence
         if disease_incidence <= 0.20:
             final_status = "Healthy"
-        elif disease_incidence <= 0.40:
+        elif disease_incidence <= 0.50:
             final_status = "Moderate"
         else:
             final_status = "Unhealthy"

@@ -48,6 +48,7 @@ export default function MapBase({
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const [lastResult, setLastResult] = useState<{
     status: string;
     predictedClass: string;
@@ -101,7 +102,7 @@ export default function MapBase({
       <div style="font-weight:700;margin-bottom:4px;">${metricLabel}</div>
       ${row("#2ECC71", "Healthy")}
       ${row("#F1C40F", "Moderate")}
-      ${row("#E74C3C", "Sick")}
+      ${row("#E74C3C", "Unhealthy")}
       ${row("#BDC3C7", "Pending / Insufficient data")}
       ${row("#95A5A6", "No data")}
       <div style="margin-top:8px;color:#6b7280;">
@@ -134,6 +135,7 @@ export default function MapBase({
     setCurrentZoneName("");
     setImageFile(null);
     setLastResult(null);
+    setIsDragging(false);
 
     setImagePreview((prev) => {
       if (prev) URL.revokeObjectURL(prev);
@@ -158,6 +160,14 @@ export default function MapBase({
       return URL.createObjectURL(file);
     });
 
+    setImageFile(file);
+  };
+
+  const handleFileDrop = (file: File) => {
+    setImagePreview((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return URL.createObjectURL(file);
+    });
     setImageFile(file);
   };
 
@@ -363,7 +373,7 @@ const legend = (L as any).control({ position: "topright" });
     const legendEl = legend?.getContainer?.();
     if (!legendEl) return;
     legendEl.innerHTML = buildLegendHtml(getRollingWindowLabel(healthWindowDays));
-  }, [mapReady, mapElementId, healthWindowDays]);
+  }, [mapReady, mapElementId, healthWindowDays, healthMetric]);
 
   /* ================= RENDER ZONES ================= */
   useEffect(() => {
@@ -403,13 +413,14 @@ const legend = (L as any).control({ position: "topright" });
 
     const createZoneMarker = (z: HibiscusZone, poly: any) => {
       const center = poly.getBounds().getCenter();
+      const zoneColor = getZoneColor(z);
 
       const marker = L.marker(center, {
         icon: L.divIcon({
           className: "",
           html: `
             <div style="
-              background:#16a34a;
+              background:${zoneColor};
               width:18px;
               height:18px;
               border-radius:50%;
@@ -547,11 +558,37 @@ const legend = (L as any).control({ position: "topright" });
           <div className="bg-white p-6 rounded-xl w-96 space-y-4">
             <h2 className="font-bold text-lg">{currentZoneName}</h2>
 
-            <label className="block border-2 border-dashed p-4 text-center cursor-pointer">
+            <label
+              className={`block border-2 border-dashed p-4 text-center cursor-pointer transition ${
+                isDragging ? "border-emerald-500 bg-emerald-50" : "border-gray-300"
+              }`}
+              onDragEnter={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                setIsDragging(true);
+              }}
+              onDragOver={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                setIsDragging(true);
+              }}
+              onDragLeave={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                setIsDragging(false);
+              }}
+              onDrop={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                setIsDragging(false);
+                const file = event.dataTransfer?.files?.[0];
+                if (file) handleFileDrop(file);
+              }}
+            >
               {imagePreview ? (
                 <img src={imagePreview} className="mx-auto max-h-40" />
               ) : (
-                "Click to upload image"
+                "Drag & drop or click to upload image"
               )}
               <input type="file" accept="image/*" hidden onChange={handleFileChange} />
             </label>

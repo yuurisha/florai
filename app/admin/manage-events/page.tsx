@@ -2,18 +2,20 @@
 
 import { useEffect, useMemo, useState } from "react"
 import toast from "react-hot-toast"
-import { Check, X, RefreshCcw } from "lucide-react"
+import { Check, X, RefreshCcw, Trash2 } from "lucide-react"
 
 import AdminTopNavbar from "../../../components/adminTopNavBar"
 import { Button } from "../../../components/button"
 import { Card, CardContent, CardHeader, CardTitle } from "../../../components/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../components/select"
+import ConfirmDeleteModal from "../../../components/ConfirmDeleteModal"
 
 import type { Event } from "../../../models/Event"
 import {
   fetchAllEventsAdmin,
   approveEvent,
   rejectEvent,
+  deleteEvent,
 } from "../../../controller/eventController"
 
 type StatusFilter = "pending" | "approved" | "rejected" | "all"
@@ -21,16 +23,22 @@ type StatusFilter = "pending" | "approved" | "rejected" | "all"
 export default function AdminEventsPage() {
   const [events, setEvents] = useState<Event[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("pending")
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+  const [eventToDelete, setEventToDelete] = useState<string | null>(null)
 
   // ---- Load events ----
   const loadEvents = async () => {
     try {
       setLoading(true)
+      setError(null)
       const data = await fetchAllEventsAdmin()
       setEvents(data)
-    } catch (err) {
-      console.error(err)
+    } catch (err: any) {
+      console.error("Error loading events:", err)
+      setError(err?.message || "Failed to load events. Please try again.")
       toast.error("Failed to load events.")
     } finally {
       setLoading(false)
@@ -59,33 +67,81 @@ export default function AdminEventsPage() {
 
   // ---- Actions ----
   const handleApprove = async (eventId: string) => {
+    setActionLoading(eventId)
+    
+    // Store previous state for rollback
+    const previousEvents = [...events]
+    
+    // Optimistic update
+    setEvents((prev) =>
+      prev.map((e) => (e.id === eventId ? { ...e, status: "approved" } : e)),
+    )
+
     try {
       await approveEvent(eventId)
-
-      // update local state instantly (no need to refetch)
-      setEvents((prev) =>
-        prev.map((e) => (e.id === eventId ? { ...e, status: "approved" } : e)),
-      )
-
       toast.success("Event approved.")
-    } catch (err) {
-      console.error(err)
-      toast.error("Failed to approve event.")
+    } catch (err: any) {
+      console.error("Error approving event:", err)
+      // Rollback on failure
+      setEvents(previousEvents)
+      toast.error(err?.message || "Failed to approve event.")
+    } finally {
+      setActionLoading(null)
     }
   }
 
   const handleReject = async (eventId: string) => {
+    setActionLoading(eventId)
+    
+    // Store previous state for rollback
+    const previousEvents = [...events]
+    
+    // Optimistic update
+    setEvents((prev) =>
+      prev.map((e) => (e.id === eventId ? { ...e, status: "rejected" } : e)),
+    )
+
     try {
       await rejectEvent(eventId)
-
-      setEvents((prev) =>
-        prev.map((e) => (e.id === eventId ? { ...e, status: "rejected" } : e)),
-      )
-
       toast.success("Event rejected.")
-    } catch (err) {
-      console.error(err)
-      toast.error("Failed to reject event.")
+    } catch (err: any) {
+      console.error("Error rejecting event:", err)
+      // Rollback on failure
+      setEvents(previousEvents)
+      toast.error(err?.message || "Failed to reject event.")
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  const handleDelete = (eventId: string) => {
+    setEventToDelete(eventId)
+    setDeleteModalOpen(true)
+  }
+
+  const confirmDelete = async () => {
+    if (!eventToDelete) return
+
+    setActionLoading(eventToDelete)
+    setDeleteModalOpen(false)
+    
+    // Store previous state for rollback
+    const previousEvents = [...events]
+    
+    // Optimistic removal
+    setEvents((prev) => prev.filter((e) => e.id !== eventToDelete))
+
+    try {
+      await deleteEvent(eventToDelete)
+      toast.success("Event deleted permanently.")
+    } catch (err: any) {
+      console.error("Error deleting event:", err)
+      // Rollback on failure
+      setEvents(previousEvents)
+      toast.error(err?.message || "Failed to delete event.")
+    } finally {
+      setActionLoading(null)
+      setEventToDelete(null)
     }
   }
 
@@ -140,7 +196,27 @@ export default function AdminEventsPage() {
 
         {/* Content */}
         {loading ? (
-          <div className="text-gray-600">Loading events...</div>
+          <div className="flex flex-col items-center justify-center py-12">
+            <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-emerald-600 border-r-transparent mb-4"></div>
+            <p className="text-gray-600">Loading events...</p>
+          </div>
+        ) : error ? (
+          <Card className="border-red-200 bg-red-50">
+            <CardContent className="pt-6">
+              <div className="text-center space-y-4">
+                <p className="text-red-600 font-semibold">Error Loading Events</p>
+                <p className="text-red-500 text-sm">{error}</p>
+                <Button
+                  onClick={loadEvents}
+                  variant="outline"
+                  className="gap-2"
+                >
+                  <RefreshCcw className="h-4 w-4" />
+                  Retry
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         ) : filteredEvents.length === 0 ? (
           <div className="text-gray-600">
             No events found for: <span className="font-medium">{statusFilter}</span>
@@ -184,18 +260,20 @@ export default function AdminEventsPage() {
                       <Button
                         className="bg-emerald-600 hover:bg-emerald-700 gap-2"
                         onClick={() => handleApprove(event.id)}
+                        disabled={actionLoading === event.id}
                       >
                         <Check className="h-4 w-4" />
-                        Approve
+                        {actionLoading === event.id ? "Approving..." : "Approve"}
                       </Button>
 
                       <Button
                         variant="destructive"
                         className="gap-2"
                         onClick={() => handleReject(event.id)}
+                        disabled={actionLoading === event.id}
                       >
                         <X className="h-4 w-4" />
-                        Reject
+                        {actionLoading === event.id ? "Rejecting..." : "Reject"}
                       </Button>
                     </div>
                   ) : (
@@ -203,12 +281,38 @@ export default function AdminEventsPage() {
                       No actions available for {event.status}.
                     </div>
                   )}
+
+                  {/* Delete button - available for all statuses */}
+                  <div className="pt-2 border-t">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+                      onClick={() => handleDelete(event.id)}
+                      disabled={actionLoading === event.id}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                      {actionLoading === event.id ? "Deleting..." : "Delete Event"}
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             ))}
           </div>
         )}
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {deleteModalOpen && (
+        <ConfirmDeleteModal
+          message="Are you sure you want to permanently delete this event? This action cannot be undone."
+          onConfirm={confirmDelete}
+          onCancel={() => {
+            setDeleteModalOpen(false)
+            setEventToDelete(null)
+          }}
+        />
+      )}
     </div>
   )
 }

@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import AdminTopNavbar from "../../../components/adminTopNavBar";
+import toast from "react-hot-toast";
 
 import { ICON_KEY_OPTIONS } from "@/lib/learningIcons";
 import type { Difficulty, ResourceType, TipCategory, Resource, Tip } from "@/models/Learning";
@@ -17,6 +18,7 @@ import {
 } from "@/controller/learningContentController";
 
 import { getUserRole } from "@/controller/userController";
+import ConfirmDeleteModal from "@/components/ConfirmDeleteModal";
 
 const TIP_CATEGORIES: TipCategory[] = ["Watering", "Planting", "Soil Care", "Maintenance", "Nutrition"];
 const RESOURCE_TYPES: ResourceType[] = ["Guide", "Video Course", "Reference"];
@@ -66,6 +68,10 @@ export default function AdminLearningContentPage() {
   const [eResIconKey, setEResIconKey] = useState<string>("bookOpen");
   const [eResContent, setEResContent] = useState("");
 
+  // ----- Delete confirmation modals
+  const [deletingTip, setDeletingTip] = useState<{ id: string; title: string } | null>(null);
+  const [deletingResource, setDeletingResource] = useState<{ id: string; title: string } | null>(null);
+
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -94,7 +100,10 @@ export default function AdminLearningContentPage() {
   const forbidden = useMemo(() => !checkingRole && role !== "admin", [checkingRole, role]);
 
   async function onAddTip() {
-    if (!tipTitle.trim() || !tipDesc.trim()) return alert("Tip title + description required.");
+    if (!tipTitle.trim() || !tipDesc.trim()) {
+      toast.error("Tip title and description are required.");
+      return;
+    }
     setBusy(true);
     try {
       await addTip({
@@ -113,8 +122,10 @@ export default function AdminLearningContentPage() {
   }
 
   async function onAddResource() {
-    if (!resTitle.trim() || !resDesc.trim() || !resContent.trim())
-      return alert("Resource title + description + content required.");
+    if (!resTitle.trim() || !resDesc.trim() || !resContent.trim()) {
+      toast.error("Resource title, description, and content are required.");
+      return;
+    }
 
     setBusy(true);
     try {
@@ -159,9 +170,59 @@ export default function AdminLearningContentPage() {
     setEResContent(r.content ?? "");
   }
 
+  // Check if tip has been modified
+  const tipHasChanges = editingTip && (
+    eTipTitle.trim() !== (editingTip.title ?? "") ||
+    eTipDesc.trim() !== (editingTip.description ?? "") ||
+    eTipCategory !== (editingTip.category ?? "Watering") ||
+    eTipIconKey !== (editingTip.iconKey ?? "droplets")
+  );
+
+  // Check if resource has been modified
+  const resourceHasChanges = editingResource && (
+    eResTitle.trim() !== (editingResource.title ?? "") ||
+    eResDesc.trim() !== (editingResource.description ?? "") ||
+    eResType !== (editingResource.type ?? "Guide") ||
+    eResDifficulty !== (editingResource.difficulty ?? "Beginner") ||
+    eResDuration.trim() !== (editingResource.duration ?? "30 min read") ||
+    eResIconKey !== (editingResource.iconKey ?? "bookOpen") ||
+    eResContent.trim() !== (editingResource.content ?? "")
+  );
+
+  async function handleDeleteTip() {
+    if (!deletingTip) return;
+    setBusy(true);
+    try {
+      await deleteTip(deletingTip.id);
+      setDeletingTip(null);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleDeleteResource() {
+    if (!deletingResource) return;
+    setBusy(true);
+    try {
+      await deleteResource(deletingResource.id);
+      setDeletingResource(null);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function onSaveTipEdit() {
     if (!editingTip) return;
-    if (!eTipTitle.trim() || !eTipDesc.trim()) return alert("Tip title + description required.");
+    if (!eTipTitle.trim() || !eTipDesc.trim()) {
+      toast.error("Tip title and description are required.");
+      return;
+    }
+    
+    // Check if there are actually changes
+    if (!tipHasChanges) {
+      toast.error("No changes detected.");
+      return;
+    }
 
     setBusy(true);
     try {
@@ -179,8 +240,16 @@ export default function AdminLearningContentPage() {
 
   async function onSaveResourceEdit() {
     if (!editingResource) return;
-    if (!eResTitle.trim() || !eResDesc.trim() || !eResContent.trim())
-      return alert("Resource title + description + content required.");
+    if (!eResTitle.trim() || !eResDesc.trim() || !eResContent.trim()) {
+      toast.error("Resource title, description, and content are required.");
+      return;
+    }
+
+    // Check if there are actually changes
+    if (!resourceHasChanges) {
+      toast.error("No changes detected.");
+      return;
+    }
 
     setBusy(true);
     try {
@@ -421,7 +490,7 @@ export default function AdminLearningContentPage() {
                       </button>
                       <button
                         disabled={busy}
-                        onClick={() => deleteTip(t.id)}
+                        onClick={() => setDeletingTip({ id: t.id, title: t.title ?? "this tip" })}
                         className="rounded-md px-3 py-1 text-sm font-semibold bg-red-50 text-red-700 hover:bg-red-100 disabled:opacity-60"
                       >
                         Delete
@@ -470,7 +539,7 @@ export default function AdminLearningContentPage() {
                       </button>
                       <button
                         disabled={busy}
-                        onClick={() => deleteResource(r.id)}
+                        onClick={() => setDeletingResource({ id: r.id, title: r.title ?? "this resource" })}
                         className="rounded-md px-3 py-1 text-sm font-semibold bg-red-50 text-red-700 hover:bg-red-100 disabled:opacity-60"
                       >
                         Delete
@@ -548,9 +617,9 @@ export default function AdminLearningContentPage() {
                 Cancel
               </button>
               <button
-                disabled={busy}
+                disabled={busy || !tipHasChanges}
                 onClick={onSaveTipEdit}
-                className="rounded-md px-4 py-2 text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60"
+                className="rounded-md px-4 py-2 text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {busy ? "Saving…" : "Save Changes"}
               </button>
@@ -655,15 +724,33 @@ export default function AdminLearningContentPage() {
                 Cancel
               </button>
               <button
-                disabled={busy}
+                disabled={busy || !resourceHasChanges}
                 onClick={onSaveResourceEdit}
-                className="rounded-md px-4 py-2 text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60"
+                className="rounded-md px-4 py-2 text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {busy ? "Saving…" : "Save Changes"}
               </button>
             </div>
           </div>
         </ModalShell>
+      )}
+
+      {/* Delete Tip Confirmation Modal */}
+      {deletingTip && (
+        <ConfirmDeleteModal
+          message={`Are you sure you want to delete "${deletingTip.title}"?\nThis action cannot be undone.`}
+          onConfirm={handleDeleteTip}
+          onCancel={() => setDeletingTip(null)}
+        />
+      )}
+
+      {/* Delete Resource Confirmation Modal */}
+      {deletingResource && (
+        <ConfirmDeleteModal
+          message={`Are you sure you want to delete "${deletingResource.title}"?\nThis action cannot be undone.`}
+          onConfirm={handleDeleteResource}
+          onCancel={() => setDeletingResource(null)}
+        />
       )}
     </div>
   );

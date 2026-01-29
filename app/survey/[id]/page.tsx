@@ -58,7 +58,7 @@ export default function SurveyAnswerPage() {
       );
 
       if (!resSnap.empty) {
-        // keep it simple but less jarring than alert
+        
         setBanner({ type: "error", msg: "You’ve already submitted this survey." });
         setTimeout(() => router.push("/survey"), 800);
         return;

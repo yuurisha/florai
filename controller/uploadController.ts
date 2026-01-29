@@ -37,6 +37,7 @@ export const uploadLeafPhotoAndPredict = async (file: File, greenSpaceId: string
       throw new Error(data?.error || `AI prediction failed (HTTP ${res.status})`);
     }
 
+    //Upload-based health (metric = "uploads")
     const predictedClass = data?.predictedClass ?? "Unknown";
     const status = data?.status as "Healthy" | "Moderate" | "Unhealthy" | "Unknown";
     const summary = {
